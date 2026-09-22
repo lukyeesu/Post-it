@@ -6,13 +6,10 @@ import {
   Trash2, 
   Pin, 
   CheckCircle2, 
-  Calendar,
-  Sparkles,
-  Tag
+  Calendar
 } from 'lucide-react';
 import { PostItNote } from '@/types/post-it';
-import { GlowCard } from '@/components/ui/spotlight-card';
-import { HolographicFoilCard } from '@/components/ui/holographic-foil-card';
+import { TiltSpotlightCard } from '@/components/ui/tilt-spotlight-card';
 import confetti from 'canvas-confetti';
 
 interface PostItCardProps {
@@ -23,56 +20,83 @@ interface PostItCardProps {
   onToggleComplete: (id: string) => void;
 }
 
-const colorStyles: Record<string, {
+// Muji Minimalist Color Themes
+const mujiThemes: Record<string, {
   bg: string;
-  tapeBg: string;
   border: string;
   textColor: string;
+  mutedText: string;
   tagBg: string;
+  spotlight: string;
 }> = {
-  yellow: {
-    bg: 'bg-amber-100 dark:bg-amber-950/80',
-    tapeBg: 'bg-amber-300/60',
-    border: 'border-amber-200 dark:border-amber-800/60',
-    textColor: 'text-amber-950 dark:text-amber-100',
-    tagBg: 'bg-amber-200/80 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200',
+  sand: {
+    bg: 'bg-[#FAF8F4] dark:bg-[#24211F]',
+    border: 'border-[#E6E0D4] dark:border-[#3A3633]',
+    textColor: 'text-[#2D2824] dark:text-[#ECE9E4]',
+    mutedText: 'text-[#7A756E] dark:text-[#9E9990]',
+    tagBg: 'bg-[#EFECE5] text-[#59544D] dark:bg-[#2F2C2A] dark:text-[#C4C0B8]',
+    spotlight: 'rgba(255, 255, 255, 0.4)',
   },
-  green: {
-    bg: 'bg-emerald-100 dark:bg-emerald-950/80',
-    tapeBg: 'bg-emerald-300/60',
-    border: 'border-emerald-200 dark:border-emerald-800/60',
-    textColor: 'text-emerald-950 dark:text-emerald-100',
-    tagBg: 'bg-emerald-200/80 text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-200',
+  kraft: {
+    bg: 'bg-[#F3EADB] dark:bg-[#2A241F]',
+    border: 'border-[#DFD3BE] dark:border-[#423932]',
+    textColor: 'text-[#2E271F] dark:text-[#EFE7DC]',
+    mutedText: 'text-[#7D6F5E] dark:text-[#A89A8A]',
+    tagBg: 'bg-[#E5D9C5] text-[#594B3C] dark:bg-[#382F28] dark:text-[#D1C3B2]',
+    spotlight: 'rgba(255, 255, 255, 0.35)',
   },
-  blue: {
-    bg: 'bg-sky-100 dark:bg-sky-950/80',
-    tapeBg: 'bg-sky-300/60',
-    border: 'border-sky-200 dark:border-sky-800/60',
-    textColor: 'text-sky-950 dark:text-sky-100',
-    tagBg: 'bg-sky-200/80 text-sky-900 dark:bg-sky-900/60 dark:text-sky-200',
+  sage: {
+    bg: 'bg-[#EEF3ED] dark:bg-[#202521]',
+    border: 'border-[#D9E3D7] dark:border-[#353D37]',
+    textColor: 'text-[#242F26] dark:text-[#E4EBE5]',
+    mutedText: 'text-[#6A786D] dark:text-[#90A193]',
+    tagBg: 'bg-[#DEE8DC] text-[#445447] dark:bg-[#2C352E] dark:text-[#B6C7B9]',
+    spotlight: 'rgba(255, 255, 255, 0.4)',
   },
-  purple: {
-    bg: 'bg-purple-100 dark:bg-purple-950/80',
-    tapeBg: 'bg-purple-300/60',
-    border: 'border-purple-200 dark:border-purple-800/60',
-    textColor: 'text-purple-950 dark:text-purple-100',
-    tagBg: 'bg-purple-200/80 text-purple-900 dark:bg-purple-900/60 dark:text-purple-200',
+  sky: {
+    bg: 'bg-[#EEF3F7] dark:bg-[#1E2428]',
+    border: 'border-[#D8E3EB] dark:border-[#323D44]',
+    textColor: 'text-[#202B33] dark:text-[#E3EBF0]',
+    mutedText: 'text-[#6B7985] dark:text-[#91A2B0]',
+    tagBg: 'bg-[#DEE7EE] text-[#425260] dark:bg-[#2A343B] dark:text-[#B7C7D4]',
+    spotlight: 'rgba(255, 255, 255, 0.4)',
   },
-  pink: {
-    bg: 'bg-rose-100 dark:bg-rose-950/80',
-    tapeBg: 'bg-rose-300/60',
-    border: 'border-rose-200 dark:border-rose-800/60',
-    textColor: 'text-rose-950 dark:text-rose-100',
-    tagBg: 'bg-rose-200/80 text-rose-900 dark:bg-rose-900/60 dark:text-rose-200',
+  clay: {
+    bg: 'bg-[#F7EBE8] dark:bg-[#2A2120]',
+    border: 'border-[#EAD5D0] dark:border-[#423432]',
+    textColor: 'text-[#332220] dark:text-[#EFE5E3]',
+    mutedText: 'text-[#856A67] dark:text-[#B0928E]',
+    tagBg: 'bg-[#EAD9D5] text-[#5E4441] dark:bg-[#382A28] dark:text-[#D4BCB8]',
+    spotlight: 'rgba(255, 255, 255, 0.35)',
   },
-  orange: {
-    bg: 'bg-orange-100 dark:bg-orange-950/80',
-    tapeBg: 'bg-orange-300/60',
-    border: 'border-orange-200 dark:border-orange-800/60',
-    textColor: 'text-orange-950 dark:text-orange-100',
-    tagBg: 'bg-orange-200/80 text-orange-900 dark:bg-orange-900/60 dark:text-orange-200',
+  ochre: {
+    bg: 'bg-[#FAF2DF] dark:bg-[#29241B]',
+    border: 'border-[#EDDFC0] dark:border-[#443B2B]',
+    textColor: 'text-[#332917] dark:text-[#EFE5D0]',
+    mutedText: 'text-[#857352] dark:text-[#AB9A78]',
+    tagBg: 'bg-[#EFE2C5] text-[#5E4F32] dark:bg-[#383021] dark:text-[#D1C3A3]',
+    spotlight: 'rgba(255, 255, 255, 0.4)',
+  },
+  charcoal: {
+    bg: 'bg-[#2D2926] dark:bg-[#1A1817]',
+    border: 'border-[#443E3B] dark:border-[#2C2927]',
+    textColor: 'text-[#FAF8F5] dark:text-[#ECE9E4]',
+    mutedText: 'text-[#A39D96] dark:text-[#807B75]',
+    tagBg: 'bg-[#3E3835] text-[#D4CEC7] dark:bg-[#262322] dark:text-[#B5AFA8]',
+    spotlight: 'rgba(255, 255, 255, 0.15)',
   },
 };
+
+// Map legacy color names to Muji palette
+function resolveTheme(color: string) {
+  if (mujiThemes[color]) return mujiThemes[color];
+  if (color === 'yellow' || color === 'orange') return mujiThemes.ochre;
+  if (color === 'green') return mujiThemes.sage;
+  if (color === 'blue') return mujiThemes.sky;
+  if (color === 'pink' || color === 'purple') return mujiThemes.clay;
+  if (color === 'spotlight' || color === 'holographic') return mujiThemes.charcoal;
+  return mujiThemes.sand;
+}
 
 export const PostItCard: React.FC<PostItCardProps> = ({
   note,
@@ -82,6 +106,7 @@ export const PostItCard: React.FC<PostItCardProps> = ({
   onToggleComplete,
 }) => {
   const [copied, setCopied] = useState(false);
+  const theme = resolveTheme(note.color);
 
   // One-click Copy Handler
   const handleCopy = async (e: React.MouseEvent) => {
@@ -100,9 +125,9 @@ export const PostItCard: React.FC<PostItCardProps> = ({
     e.stopPropagation();
     if (!note.isCompleted) {
       confetti({
-        particleCount: 40,
-        spread: 60,
-        origin: { y: 0.8 },
+        particleCount: 25,
+        spread: 45,
+        origin: { y: 0.85 },
       });
     }
     onToggleComplete(note.id);
@@ -113,268 +138,113 @@ export const PostItCard: React.FC<PostItCardProps> = ({
     month: 'short',
   });
 
-  // 1. Holographic Foil Card Rendering
-  if (note.color === 'holographic') {
-    return (
-      <div className="relative group w-full flex justify-center">
-        {/* Quick Action Floating Bar */}
-        <div className="absolute top-2 right-4 z-30 flex items-center gap-1 bg-black/60 backdrop-blur-md rounded-lg p-1 opacity-90 group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={handleCopy}
-            className="p-1.5 rounded hover:bg-white/20 text-white transition-colors"
-            title="คัดลอกข้อความ (One-click Copy)"
-          >
-            {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-          </button>
-          <button
-            onClick={() => onTogglePin(note.id)}
-            className="p-1.5 rounded hover:bg-white/20 text-white transition-colors"
-            title={note.isPinned ? "ถอนหมุด" : "ปักหมุด"}
-          >
-            <Pin className={`w-4 h-4 ${note.isPinned ? 'fill-amber-400 text-amber-400' : ''}`} />
-          </button>
-          <button
-            onClick={() => onEdit(note)}
-            className="p-1.5 rounded hover:bg-white/20 text-white transition-colors"
-            title="แก้ไข"
-          >
-            <Edit3 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => onDelete(note.id)}
-            className="p-1.5 rounded hover:bg-rose-500/40 text-rose-300 transition-colors"
-            title="ลบ"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
-
-        <HolographicFoilCard
-          name={note.title}
-          set={note.category.toUpperCase()}
-          number={formattedDate}
-          tag="HOLO VIP"
-        >
-          <div className="flex flex-col flex-1 my-2 justify-between">
-            <div className="p-3 rounded-xl border border-white/15 bg-white/5 backdrop-blur-sm">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-mono tracking-widest text-amber-300 uppercase">
-                  ✦ {note.category} ✦
-                </span>
-                {note.isPinned && (
-                  <span className="text-[10px] text-amber-400 flex items-center gap-0.5">
-                    <Pin className="w-3 h-3 fill-amber-400" /> Pinned
-                  </span>
-                )}
-              </div>
-              <h3 className="font-bold text-base text-white line-clamp-1 mb-1">{note.title}</h3>
-              <p className={`font-handwriting text-lg text-zinc-100 whitespace-pre-line line-clamp-5 ${note.isCompleted ? 'line-through opacity-60' : ''}`}>
-                {note.content}
-              </p>
-            </div>
-
-            {/* Tags */}
-            {note.tags && note.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {note.tags.map((tag) => (
-                  <span key={tag} className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-200 border border-cyan-400/30">
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        </HolographicFoilCard>
-      </div>
-    );
-  }
-
-  // 2. Spotlight Card (GlowCard) Rendering
-  if (note.color === 'spotlight') {
-    return (
-      <div className="relative group w-full flex justify-center">
-        <GlowCard 
-          glowColor={note.glowColor || 'purple'} 
-          customSize={true}
-          className="w-full min-h-[300px] flex flex-col justify-between"
-        >
-          <div>
-            {/* Header */}
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-mono tracking-wider text-purple-300 uppercase flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                {note.category}
-              </span>
-
-              {/* Actions */}
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={handleCopy}
-                  className="p-1 rounded hover:bg-white/10 text-white/80 transition-colors"
-                  title="คัดลอกข้อความ"
-                >
-                  {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                </button>
-                <button
-                  onClick={() => onTogglePin(note.id)}
-                  className="p-1 rounded hover:bg-white/10 text-white/80 transition-colors"
-                  title={note.isPinned ? "ถอนหมุด" : "ปักหมุด"}
-                >
-                  <Pin className={`w-4 h-4 ${note.isPinned ? 'fill-amber-400 text-amber-400' : ''}`} />
-                </button>
-                <button
-                  onClick={() => onEdit(note)}
-                  className="p-1 rounded hover:bg-white/10 text-white/80 transition-colors"
-                  title="แก้ไข"
-                >
-                  <Edit3 className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => onDelete(note.id)}
-                  className="p-1 rounded hover:bg-rose-500/30 text-rose-300 transition-colors"
-                  title="ลบ"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Note Title & Content */}
-            <h3 className="font-bold text-lg text-white mb-2 leading-snug">{note.title}</h3>
-            <p className={`font-handwriting text-xl text-zinc-200 whitespace-pre-line leading-relaxed ${note.isCompleted ? 'line-through opacity-50' : ''}`}>
-              {note.content}
-            </p>
-          </div>
-
-          {/* Footer */}
-          <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs text-white/60">
-            <div className="flex flex-wrap gap-1">
-              {note.tags?.map((tag) => (
-                <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/80">
-                  #{tag}
-                </span>
-              ))}
-            </div>
-            <button
-              onClick={handleCompleteWithConfetti}
-              className="flex items-center gap-1 hover:text-white"
-            >
-              <CheckCircle2 className={`w-4 h-4 ${note.isCompleted ? 'text-emerald-400' : 'text-white/40'}`} />
-              <span>{note.isCompleted ? 'เสร็จสิ้น' : 'ทำเสร็จ'}</span>
-            </button>
-          </div>
-        </GlowCard>
-      </div>
-    );
-  }
-
-  // 3. Classic Realistic Post-it Note
-  const theme = colorStyles[note.color] || colorStyles.yellow;
-
   return (
-    <div 
-      className={`group relative rounded-2xl p-5 shadow-md hover:shadow-xl transition-all duration-300 border flex flex-col justify-between min-h-[280px] ${theme.bg} ${theme.border} transform hover:-translate-y-1`}
+    <TiltSpotlightCard
+      maxTilt={8}
+      spotlightColor={theme.spotlight}
+      className={`border rounded-2xl p-5 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between min-h-[250px] ${theme.bg} ${theme.border}`}
     >
-      {/* Tape Decoration on Top */}
-      <div className={`absolute -top-2.5 left-1/2 -translate-x-1/2 w-20 h-5 rounded-sm shadow-sm opacity-70 backdrop-blur-xs ${theme.tapeBg} transform -rotate-1`} />
-
       <div>
-        {/* Top Header: Category, Pin Badge & Action Buttons */}
+        {/* Top Header: Category & Actions */}
         <div className="flex items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-1.5">
-            <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${theme.tagBg}`}>
+            <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full tracking-tight ${theme.tagBg}`}>
               {note.category}
             </span>
             {note.isPinned && (
-              <span className="flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300">
-                <Pin className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+              <span title="ปักหมุดไว้บนสุด">
+                <Pin className="w-3.5 h-3.5 fill-[#B45309] text-[#B45309] dark:fill-[#D97706] dark:text-[#D97706]" />
               </span>
             )}
           </div>
 
-          {/* Actions toolbar */}
-          <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+          {/* Minimal Action Toolbar */}
+          <div className="flex items-center gap-0.5">
             {/* One-click Copy Button */}
             <button
               onClick={handleCopy}
-              className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 text-zinc-700 dark:text-zinc-200 transition-all active:scale-90"
-              title="คัดลอกข้อความทันที (One-click Copy)"
+              className={`p-1.5 rounded-lg transition-all ${
+                copied
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                  : 'hover:bg-black/5 dark:hover:bg-white/10 ' + theme.mutedText
+              }`}
+              title="คัดลอกข้อความในคลิกเดียว"
             >
-              {copied ? (
-                <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                  <Check className="w-4 h-4" />
-                </span>
-              ) : (
-                <Copy className="w-4 h-4" />
-              )}
+              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
             </button>
 
-            {/* Pin Button */}
+            {/* Pin Toggle */}
             <button
               onClick={() => onTogglePin(note.id)}
-              className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 text-zinc-700 dark:text-zinc-200 transition-colors"
-              title={note.isPinned ? "ถอนหมุด" : "ปักหมุดไว้บนสุด"}
+              className={`p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${
+                note.isPinned ? 'text-[#B45309] dark:text-[#D97706]' : theme.mutedText
+              }`}
+              title={note.isPinned ? "ถอนหมุด" : "ปักหมุด"}
             >
-              <Pin className={`w-4 h-4 ${note.isPinned ? 'fill-amber-500 text-amber-500' : ''}`} />
+              <Pin className={`w-3.5 h-3.5 ${note.isPinned ? 'fill-current' : ''}`} />
             </button>
 
-            {/* Edit Button */}
+            {/* Edit */}
             <button
               onClick={() => onEdit(note)}
-              className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 text-zinc-700 dark:text-zinc-200 transition-colors"
-              title="แก้ไขโพสต์อิท"
+              className={`p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${theme.mutedText}`}
+              title="แก้ไข"
             >
-              <Edit3 className="w-4 h-4" />
+              <Edit3 className="w-3.5 h-3.5" />
             </button>
 
-            {/* Delete Button */}
+            {/* Delete */}
             <button
               onClick={() => onDelete(note.id)}
-              className="p-1.5 rounded-lg hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 transition-colors"
-              title="ลบโพสต์อิท"
+              className="p-1.5 rounded-lg hover:bg-rose-500/10 text-rose-500/80 hover:text-rose-600 transition-colors"
+              title="ลบ"
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
 
-        {/* Title */}
-        <h3 className={`font-bold text-lg mb-2 leading-snug tracking-tight ${theme.textColor}`}>
+        {/* Note Title (Clean modern typography) */}
+        <h3 className={`font-semibold text-base mb-2 leading-snug tracking-tight ${theme.textColor}`}>
           {note.title}
         </h3>
 
-        {/* Content with handwriting font */}
-        <p className={`font-handwriting text-2xl leading-snug whitespace-pre-line break-words ${theme.textColor} ${note.isCompleted ? 'line-through opacity-50' : ''}`}>
+        {/* Note Body (Crisp, highly legible Thai/English font) */}
+        <p className={`text-sm leading-relaxed whitespace-pre-line break-words ${theme.textColor} ${note.isCompleted ? 'line-through opacity-40' : 'opacity-90'}`}>
           {note.content}
         </p>
       </div>
 
-      {/* Card Footer: Date, Tags & Complete Toggle */}
-      <div className="mt-4 pt-3 border-t border-black/5 dark:border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs">
-        {/* Tags */}
+      {/* Card Footer */}
+      <div className="mt-4 pt-3 border-t border-black/5 dark:border-white/5 flex items-center justify-between gap-2 text-xs">
+        {/* Tags / Date */}
         <div className="flex flex-wrap items-center gap-1">
           {note.tags && note.tags.length > 0 ? (
             note.tags.map((tag) => (
-              <span key={tag} className="text-[10px] px-2 py-0.5 rounded-md bg-black/5 dark:bg-white/10 font-medium text-zinc-600 dark:text-zinc-300">
+              <span key={tag} className={`text-[11px] px-2 py-0.5 rounded-md ${theme.tagBg}`}>
                 #{tag}
               </span>
             ))
           ) : (
-            <span className="text-[10px] text-zinc-400 flex items-center gap-1">
+            <span className={`text-[11px] flex items-center gap-1 ${theme.mutedText}`}>
               <Calendar className="w-3 h-3" /> {formattedDate}
             </span>
           )}
         </div>
 
-        {/* Complete Checkbox */}
+        {/* Complete Toggle */}
         <button
           onClick={handleCompleteWithConfetti}
-          className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white font-medium"
+          className={`flex items-center gap-1 text-xs transition-colors ${
+            note.isCompleted 
+              ? 'text-emerald-600 dark:text-emerald-400 font-medium' 
+              : theme.mutedText + ' hover:text-[#2D2824] dark:hover:text-[#ECE9E4]'
+          }`}
         >
-          <CheckCircle2 className={`w-4 h-4 ${note.isCompleted ? 'text-emerald-600 dark:text-emerald-400 fill-emerald-100 dark:fill-emerald-950' : 'text-zinc-400'}`} />
-          <span>{note.isCompleted ? 'เสร็จแล้ว' : 'ทำเสร็จ'}</span>
+          <CheckCircle2 className={`w-3.5 h-3.5 ${note.isCompleted ? 'fill-emerald-100 dark:fill-emerald-950' : ''}`} />
+          <span>{note.isCompleted ? 'เสร็จสิ้น' : 'ทำเสร็จ'}</span>
         </button>
       </div>
-    </div>
+    </TiltSpotlightCard>
   );
 };

@@ -1,12 +1,13 @@
 export type NoteColor = 
-  | 'yellow' 
-  | 'green' 
-  | 'blue' 
-  | 'purple' 
-  | 'pink' 
-  | 'orange' 
-  | 'spotlight' 
-  | 'holographic';
+  | 'sand'      // Muji Natural Off-White
+  | 'kraft'     // Warm Kraft Paper
+  | 'sage'      // Pale Matcha Sage
+  | 'sky'       // Calm Morning Blue
+  | 'clay'      // Soft Terracotta
+  | 'ochre'     // Warm Mustard
+  | 'charcoal'  // Minimal Dark Slate
+  // Legacy / fallback colors
+  | 'yellow' | 'green' | 'blue' | 'purple' | 'pink' | 'orange' | 'spotlight' | 'holographic';
 
 export type NoteCategory = 
   | 'All'
@@ -14,7 +15,7 @@ export type NoteCategory =
   | 'Ideas' 
   | 'Todo' 
   | 'Personal' 
-  | 'Urgent' 
+  | 'Focus'
   | string;
 
 export interface PostItNote {

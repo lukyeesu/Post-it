@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Prompt:wght@300;400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,44 +6,44 @@
 
 @layer base {
   :root {
-    --background: 240 20% 98%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
-    --radius: 0.75rem;
+    --background: 40 25% 97%;   /* #FAF8F5 Muji Warm Linen */
+    --foreground: 24 10% 16%;   /* #2D2824 Deep Charcoal */
+    --card: 40 30% 98%;
+    --card-foreground: 24 10% 16%;
+    --popover: 40 30% 98%;
+    --popover-foreground: 24 10% 16%;
+    --primary: 24 10% 18%;
+    --primary-foreground: 40 30% 98%;
+    --secondary: 40 15% 92%;
+    --secondary-foreground: 24 10% 20%;
+    --muted: 40 12% 90%;
+    --muted-foreground: 24 8% 46%;
+    --accent: 40 15% 92%;
+    --accent-foreground: 24 10% 16%;
+    --border: 40 15% 88%;
+    --input: 40 15% 88%;
+    --ring: 24 10% 30%;
+    --radius: 1rem;
   }
 
   .dark {
-    --background: 240 10% 6%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --background: 24 8% 11%;    /* #1D1B1A Calm Warm Black */
+    --foreground: 40 15% 92%;   /* #ECE9E4 Muted Off-White */
+    --card: 24 8% 14%;
+    --card-foreground: 40 15% 92%;
+    --popover: 24 8% 14%;
+    --popover-foreground: 40 15% 92%;
+    --primary: 40 20% 94%;
+    --primary-foreground: 24 8% 11%;
+    --secondary: 24 8% 18%;
+    --secondary-foreground: 40 15% 92%;
+    --muted: 24 8% 20%;
+    --muted-foreground: 40 10% 60%;
+    --accent: 24 8% 18%;
+    --accent-foreground: 40 15% 92%;
+    --border: 24 8% 22%;
+    --input: 24 8% 22%;
+    --ring: 40 15% 70%;
   }
 }
 
@@ -54,23 +54,36 @@
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Prompt', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
-  overflow-x: hidden;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
 }
 
-.font-handwriting {
-  font-family: 'Caveat', cursive, sans-serif;
+/* Minimalist Japanese Paper Texture / Subtle Grid */
+.bg-muji-grid {
+  background-image: radial-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+  background-size: 20px 20px;
 }
 
-/* Custom corkboard / grid background for sticky board */
-.bg-corkboard-pattern {
-  background-image: radial-gradient(rgba(0, 0, 0, 0.07) 1px, transparent 1px);
-  background-size: 24px 24px;
+.dark .bg-muji-grid {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 20px 20px;
 }
 
-.dark .bg-corkboard-pattern {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
-  background-size: 24px 24px;
+/* Clean Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 9999px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
 }
