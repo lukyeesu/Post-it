@@ -40,23 +40,10 @@ export const storageService = {
   },
 
   getSheetsConfig(): GoogleSheetsConfig {
-    try {
-      const data = localStorage.getItem(SHEETS_CONFIG_KEY);
-      if (data) {
-        const parsed = JSON.parse(data);
-        if (parsed.webAppUrl && typeof parsed.webAppUrl === 'string' && parsed.webAppUrl.trim() !== '') {
-          return parsed;
-        }
-      }
-    } catch (err) {
-      console.error('Error loading sheets config:', err);
-    }
-    const defaultCfg: GoogleSheetsConfig = {
+    return {
       webAppUrl: DEFAULT_SHEETS_URL,
       autoSync: true,
     };
-    this.saveSheetsConfig(defaultCfg);
-    return defaultCfg;
   },
 
   saveSheetsConfig(config: GoogleSheetsConfig) {

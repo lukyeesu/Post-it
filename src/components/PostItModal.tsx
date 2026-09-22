@@ -96,25 +96,26 @@ export const PostItModal: React.FC<PostItModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-xs animate-fadeIn">
       <div 
-        className="w-full max-w-xl bg-[#FAF8F5] dark:bg-[#201D1C] rounded-3xl shadow-2xl border border-[#E8E4DC] dark:border-[#363230] overflow-hidden"
+        className="w-full max-w-xl bg-[#FAF8F5] dark:bg-[#201D1C] rounded-3xl shadow-2xl border border-[#E8E4DC] dark:border-[#363230] overflow-hidden flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Modal Header */}
-        <div className="px-6 sm:px-8 py-5 border-b border-[#E8E4DC] dark:border-[#363230] flex items-center justify-between">
-          <h2 className="text-lg font-bold text-[#2D2824] dark:text-[#ECE9E4]">
-            {editingNote ? 'แก้ไขโพสต์อิท' : 'สร้างโพสต์อิทใหม่'}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-[#8A857D] hover:text-[#2D2824] dark:hover:text-[#ECE9E4] hover:bg-[#EFECE6] dark:hover:bg-[#2A2725] transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        <form onSubmit={handleSubmit} className="flex flex-col h-full max-h-[90vh] overflow-hidden">
+          {/* Modal Header */}
+          <div className="px-6 sm:px-8 py-5 border-b border-[#E8E4DC] dark:border-[#363230] flex items-center justify-between shrink-0 bg-[#FAF8F5] dark:bg-[#201D1C]">
+            <h2 className="text-lg font-bold text-[#2D2824] dark:text-[#ECE9E4]">
+              {editingNote ? 'แก้ไขโพสต์อิท' : 'สร้างโพสต์อิทใหม่'}
+            </h2>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-[#8A857D] hover:text-[#2D2824] dark:hover:text-[#ECE9E4] hover:bg-[#EFECE6] dark:hover:bg-[#2A2725] transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-5 max-h-[80vh] overflow-y-auto">
+          {/* Form Body - Scrollable */}
+          <div className="p-6 sm:p-8 space-y-5 overflow-y-auto flex-1">
           
           {/* Board (บอร์ด / โปรเจกต์) Selection */}
           <div className="bg-[#F5F2EB]/60 dark:bg-[#262322]/60 p-4 rounded-2xl border border-[#E8E4DC] dark:border-[#363330]">
@@ -265,9 +266,10 @@ export const PostItModal: React.FC<PostItModalProps> = ({
               <span>ปักหมุดโพสต์อิทนี้ไว้ด้านบนสุด</span>
             </label>
           </div>
+        </div>
 
-          {/* Modal Footer */}
-          <div className="pt-5 border-t border-[#E8E4DC] dark:border-[#363230] flex items-center justify-end gap-3">
+        {/* Modal Footer (Fixed at bottom) */}
+          <div className="px-6 sm:px-8 py-4 border-t border-[#E8E4DC] dark:border-[#363230] bg-[#FAF8F5] dark:bg-[#201D1C] flex items-center justify-end gap-3 shrink-0">
             <button
               type="button"
               onClick={onClose}

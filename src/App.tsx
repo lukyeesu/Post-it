@@ -5,7 +5,6 @@ import { CategoryFilter } from '@/components/CategoryFilter';
 import { PostItCard } from '@/components/PostItCard';
 import { PostItModal } from '@/components/PostItModal';
 import { ManageTaxonomyModal } from '@/components/ManageTaxonomyModal';
-import { CloudSyncModal } from '@/components/CloudSyncModal';
 import { PostItNote, GoogleSheetsConfig } from '@/types/post-it';
 import { storageService, DEFAULT_SHEETS_URL } from '@/services/storageService';
 import { Plus, StickyNote, CheckCircle2 } from 'lucide-react';
@@ -14,7 +13,7 @@ import confetti from 'canvas-confetti';
 export function App() {
   // 1. Core State
   const [notes, setNotes] = useState<PostItNote[]>(() => storageService.getNotes());
-  const [sheetsConfig, setSheetsConfig] = useState<GoogleSheetsConfig>(() => storageService.getSheetsConfig());
+  const [sheetsConfig] = useState<GoogleSheetsConfig>(() => storageService.getSheetsConfig());
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'connected' | 'error'>('idle');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBook, setSelectedBook] = useState<string>('All');
@@ -29,7 +28,6 @@ export function App() {
   // 2. Modals State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
-  const [isCloudModalOpen, setIsCloudModalOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<PostItNote | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -94,50 +92,27 @@ export function App() {
     return () => { isMounted = false; };
   }, [sheetsConfig.webAppUrl]);
 
-  // 4. Cloud Sync Actions (Fetch & Upload)
-  const handleFetchFromSheets = async () => {
+  // 4. Cloud Sync Action (Direct Sync with Google Sheets)
+  const handleSyncNow = async () => {
     const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
     try {
       setSyncStatus('syncing');
-      showToast('กำลังดึงข้อมูลจาก Google Sheets...');
+      showToast('กำลังซิงค์ข้อมูลกับ Google Sheets...');
       const remoteNotes = await storageService.fetchFromGoogleSheets(targetUrl);
       if (Array.isArray(remoteNotes) && remoteNotes.length > 0) {
         setNotes(remoteNotes);
         storageService.saveNotes(remoteNotes);
         setSyncStatus('connected');
-        showToast(`ดึงข้อมูลสำเร็จ ${remoteNotes.length} รายการ ☁️`);
+        showToast(`ซิงค์ข้อมูลสำเร็จ (${remoteNotes.length} รายการ) ☁️`);
       } else {
         setSyncStatus('connected');
-        showToast('ไม่พบข้อมูลใน Google Sheets');
+        showToast('ซิงค์ข้อมูลเรียบร้อย (ไม่พบรายการใหม่)');
       }
     } catch (err) {
-      console.error('Fetch failed:', err);
+      console.error('Sync failed:', err);
       setSyncStatus('error');
-      showToast('ดึงข้อมูลไม่สำเร็จ โปรดตรวจสอบการเชื่อมต่อ');
+      showToast('ซิงค์ไม่สำเร็จ โปรดตรวจสอบการเชื่อมต่อ');
     }
-  };
-
-  const handleUploadToSheets = async () => {
-    const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
-    try {
-      setSyncStatus('syncing');
-      showToast('กำลังส่งข้อมูลขึ้น Google Sheets...');
-      await storageService.syncToGoogleSheets(targetUrl, notes);
-      setSyncStatus('connected');
-      showToast(`อัปโหลดข้อมูลสำเร็จ ${notes.length} รายการ ☁️`);
-    } catch (err) {
-      console.error('Upload failed:', err);
-      setSyncStatus('error');
-      showToast('อัปโหลดไม่สำเร็จ โปรดลองใหม่');
-    }
-  };
-
-  const handleSaveNewUrl = (newUrl: string) => {
-    const updated = { ...sheetsConfig, webAppUrl: newUrl };
-    setSheetsConfig(updated);
-    storageService.saveSheetsConfig(updated);
-    showToast('บันทึก API URL เรียบร้อย');
-    handleFetchFromSheets();
   };
 
   // 5. Boards calculation (e.g. กีฬา, งาน, ทั่วไป)
@@ -482,7 +457,7 @@ export function App() {
         onToggleDarkMode={() => setDarkMode(!darkMode)}
         totalNotes={notes.length}
         syncStatus={syncStatus}
-        onSyncNow={() => setIsCloudModalOpen(true)}
+        onSyncNow={handleSyncNow}
       />
 
       {/* Main Board Container (Widescreen fluid layout max-w-[1700px]) */}
@@ -592,18 +567,6 @@ export function App() {
         onRenameCategory={handleRenameCategory}
         onDeleteCategory={handleDeleteCategory}
         onAddCategory={handleAddCategoryGlobal}
-      />
-
-      {/* Cloud Sync Modal (Google Sheets Connection Details & Sync) */}
-      <CloudSyncModal
-        isOpen={isCloudModalOpen}
-        onClose={() => setIsCloudModalOpen(false)}
-        webAppUrl={sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL}
-        onSaveUrl={handleSaveNewUrl}
-        syncStatus={syncStatus}
-        totalLocalNotes={notes.length}
-        onFetchFromSheets={handleFetchFromSheets}
-        onUploadToSheets={handleUploadToSheets}
       />
 
     </div>

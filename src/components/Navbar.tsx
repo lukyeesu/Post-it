@@ -99,17 +99,17 @@ export const Navbar: React.FC<NavbarProps> = ({
             {syncStatus === 'syncing' ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin text-amber-600" />
-                <span className="hidden sm:inline">กำลังซิงค์</span>
+                <span>ซิงค์</span>
               </>
             ) : syncStatus === 'error' ? (
               <>
-                <AlertCircle className="w-4 h-4" />
-                <span className="hidden sm:inline">ซิงค์ชีต</span>
+                <AlertCircle className="w-4 h-4 text-rose-500" />
+                <span>ซิงค์</span>
               </>
             ) : (
               <>
                 <Cloud className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <span className="hidden sm:inline">ซิงค์ชีต</span>
+                <span>ซิงค์</span>
               </>
             )}
           </button>
