@@ -82,6 +82,19 @@ export const ManageTaxonomyModal: React.FC<ManageTaxonomyModalProps> = ({
     }
   };
 
+  const handleDeleteBoardClick = (board: string) => {
+    if (board === 'ทั่วไป') return;
+    if (window.confirm(`คุณต้องการลบบอร์ด "${board}" ใช่หรือไม่?\n\n* โน้ตในบอร์ดนี้จะไม่สูญหาย แต่จะถูกย้ายไปเก็บที่บอร์ด "ทั่วไป" อัตโนมัติ`)) {
+      onDeleteBoard(board);
+    }
+  };
+
+  const handleDeleteCategoryClick = (cat: string) => {
+    if (window.confirm(`คุณต้องการลบหมวดหมู่ "${cat}" ใช่หรือไม่?\n\n* การ์ดโพสต์อิทจะไม่สูญหาย แต่จะถูกย้ายไปรวมที่หมวดหมู่ "Ideas" อัตโนมัติ`)) {
+      onDeleteCategory(cat);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-xs animate-fadeIn">
       <div 
@@ -225,7 +238,7 @@ export const ManageTaxonomyModal: React.FC<ManageTaxonomyModalProps> = ({
 
                           <button
                             type="button"
-                            onClick={() => onDeleteBoard(b)}
+                            onClick={() => handleDeleteBoardClick(b)}
                             disabled={b === 'ทั่วไป'}
                             className={`p-2 rounded-xl transition-colors ${
                               b === 'ทั่วไป'
@@ -329,7 +342,7 @@ export const ManageTaxonomyModal: React.FC<ManageTaxonomyModalProps> = ({
 
                           <button
                             type="button"
-                            onClick={() => onDeleteCategory(c)}
+                            onClick={() => handleDeleteCategoryClick(c)}
                             className="p-2 rounded-xl text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
                             title="ลบหมวดหมู่"
                           >
