@@ -330,6 +330,41 @@ export function App() {
       });
   }, [notes, searchQuery, selectedBook, selectedCategory, showPinnedOnly, showCompletedOnly]);
 
+  // Responsive Masonry column count matching Tailwind breakpoints
+  const [columnCount, setColumnCount] = useState(() => {
+    if (typeof window === 'undefined') return 5;
+    const w = window.innerWidth;
+    if (w >= 1536) return 5;
+    if (w >= 1280) return 4;
+    if (w >= 768) return 3;
+    if (w >= 640) return 2;
+    return 1;
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      const w = window.innerWidth;
+      let c = 1;
+      if (w >= 1536) c = 5;
+      else if (w >= 1280) c = 4;
+      else if (w >= 768) c = 3;
+      else if (w >= 640) c = 2;
+      setColumnCount((prev) => (prev !== c ? c : prev));
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Distribute notes into columns for Masonry layout (eliminating vertical empty gaps)
+  const columnNotes = useMemo(() => {
+    const cols: PostItNote[][] = Array.from({ length: columnCount }, () => []);
+    filteredNotes.forEach((note, index) => {
+      cols[index % columnCount].push(note);
+    });
+    return cols;
+  }, [filteredNotes, columnCount]);
+
   // Save Note Action
   const handleSaveNote = (noteData: Omit<PostItNote, 'id' | 'createdAt' | 'updatedAt'>, id?: string) => {
     const now = new Date().toISOString();
@@ -494,18 +529,22 @@ export function App() {
           pinnedCount={pinnedCount}
         />
 
-        {/* Level 3: Post-it Notes Grid (Adaptive 4-5 cols on wide screens) */}
+        {/* Level 3: Post-it Notes Masonry (Fluid vertical stacking with zero gaps) */}
         {filteredNotes.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5 sm:gap-6 items-start">
-            {filteredNotes.map((note) => (
-              <PostItCard
-                key={note.id}
-                note={note}
-                onEdit={handleEditNote}
-                onDelete={handleDeleteNote}
-                onTogglePin={handleTogglePin}
-                onToggleComplete={handleToggleComplete}
-              />
+            {columnNotes.map((col, colIdx) => (
+              <div key={colIdx} className="flex flex-col gap-5 sm:gap-6">
+                {col.map((note) => (
+                  <PostItCard
+                    key={note.id}
+                    note={note}
+                    onEdit={handleEditNote}
+                    onDelete={handleDeleteNote}
+                    onTogglePin={handleTogglePin}
+                    onToggleComplete={handleToggleComplete}
+                  />
+                ))}
+              </div>
             ))}
           </div>
         ) : (
