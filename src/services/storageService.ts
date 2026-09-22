@@ -5,7 +5,9 @@ const STORAGE_KEY = 'webapp_post_it_notes_v1';
 const SHEETS_CONFIG_KEY = 'webapp_post_it_sheets_config_v1';
 
 export const storageService = {
-  // LocalStorage
+  // ==========================================
+  // LocalStorage Operations (Offline-First)
+  // ==========================================
   getNotes(): PostItNote[] {
     try {
       const data = localStorage.getItem(STORAGE_KEY);
@@ -51,15 +53,33 @@ export const storageService = {
     }
   },
 
-  // Google Sheets Fetch (doGet)
+  // ==========================================
+  // Google Apps Script API Operations
+  // ==========================================
+
+  // 1. Health Check / Ping API
+  async pingGoogleSheets(webAppUrl: string): Promise<boolean> {
+    if (!webAppUrl) return false;
+    try {
+      const separator = webAppUrl.includes('?') ? '&' : '?';
+      const res = await fetch(`${webAppUrl}${separator}action=ping`, {
+        method: 'GET',
+      });
+      const data = await res.json();
+      return data.status === 'success';
+    } catch (err) {
+      console.error('Ping failed:', err);
+      return false;
+    }
+  },
+
+  // 2. GET All Notes
   async fetchFromGoogleSheets(webAppUrl: string): Promise<PostItNote[]> {
     if (!webAppUrl) throw new Error('กรุณาระบุ Google Apps Script Web App URL');
     
-    const response = await fetch(webAppUrl, {
+    const separator = webAppUrl.includes('?') ? '&' : '?';
+    const response = await fetch(`${webAppUrl}${separator}action=getNotes`, {
       method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
     });
 
     if (!response.ok) {
@@ -74,16 +94,65 @@ export const storageService = {
     }
   },
 
-  // Google Sheets Push (doPost)
+  // 3. POST: Create Note API
+  async apiCreateNote(webAppUrl: string, note: PostItNote): Promise<void> {
+    if (!webAppUrl) return;
+    await this.postToApi(webAppUrl, {
+      action: 'create',
+      note: note,
+    });
+  },
+
+  // 4. POST: Update Note API
+  async apiUpdateNote(webAppUrl: string, note: PostItNote): Promise<void> {
+    if (!webAppUrl) return;
+    await this.postToApi(webAppUrl, {
+      action: 'update',
+      note: note,
+    });
+  },
+
+  // 5. POST: Delete Note API
+  async apiDeleteNote(webAppUrl: string, id: string): Promise<void> {
+    if (!webAppUrl) return;
+    await this.postToApi(webAppUrl, {
+      action: 'delete',
+      id: id,
+    });
+  },
+
+  // 6. POST: Toggle Pin API
+  async apiTogglePin(webAppUrl: string, id: string): Promise<void> {
+    if (!webAppUrl) return;
+    await this.postToApi(webAppUrl, {
+      action: 'togglePin',
+      id: id,
+    });
+  },
+
+  // 7. POST: Toggle Complete API
+  async apiToggleComplete(webAppUrl: string, id: string): Promise<void> {
+    if (!webAppUrl) return;
+    await this.postToApi(webAppUrl, {
+      action: 'toggleComplete',
+      id: id,
+    });
+  },
+
+  // 8. POST: Bulk Sync Notes
   async syncToGoogleSheets(webAppUrl: string, notes: PostItNote[]): Promise<string> {
     if (!webAppUrl) throw new Error('กรุณาระบุ Google Apps Script Web App URL');
 
-    const payload = {
+    const data = await this.postToApi(webAppUrl, {
       action: 'sync',
       notes: notes,
-    };
+    });
 
-    // Google Apps Script doPost requires text/plain or form data to avoid CORS preflight issues
+    return data.message || 'ซิงค์ข้อมูลสำเร็จ';
+  },
+
+  // Internal Helper to POST with text/plain (avoiding CORS preflight issues with Google Apps Script)
+  async postToApi(webAppUrl: string, payload: unknown): Promise<{ status: string; message?: string }> {
     const response = await fetch(webAppUrl, {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -97,11 +166,10 @@ export const storageService = {
     }
 
     const data = await response.json();
-    if (data.status === 'success') {
-      return data.message || 'ซิงค์ข้อมูลสำเร็จ';
-    } else {
-      throw new Error(data.message || 'การซิงค์ข้อมูลล้มเหลว');
+    if (data.status !== 'success') {
+      throw new Error(data.message || 'API operation failed');
     }
+    return data;
   },
 
   // Export JSON backup

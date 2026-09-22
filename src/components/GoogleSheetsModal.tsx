@@ -10,9 +10,12 @@ import {
   RefreshCw, 
   ArrowUpRight, 
   ArrowDownLeft,
-  Database
+  Database,
+  Activity,
+  Code2
 } from 'lucide-react';
 import { GoogleSheetsConfig } from '@/types/post-it';
+import { storageService } from '@/services/storageService';
 
 interface GoogleSheetsModalProps {
   isOpen: boolean;
@@ -53,6 +56,25 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
     }, 1200);
   };
 
+  const handlePing = async () => {
+    if (!url.trim()) {
+      setStatus({ type: 'error', message: 'กรุณากรอก Web App URL ก่อนทดสอบ' });
+      return;
+    }
+    setStatus({ type: 'loading', message: 'กำลังทดสอบเชื่อมต่อ API (Ping)...' });
+    try {
+      const ok = await storageService.pingGoogleSheets(url.trim());
+      if (ok) {
+        setStatus({ type: 'success', message: 'เชื่อมต่อ Google Apps Script API สำเร็จ 100%! 🚀' });
+      } else {
+        setStatus({ type: 'error', message: 'ไม่สามารถติดต่อ API ได้ ตรวจสอบ URL หรือสิทธิ์เข้าถึง (ต้องเป็น Anyone)' });
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'เกิดข้อผิดพลาดในการเชื่อมต่อ';
+      setStatus({ type: 'error', message: msg });
+    }
+  };
+
   const handlePull = async () => {
     if (!url.trim()) {
       setStatus({ type: 'error', message: 'กรุณากรอก Web App URL ก่อนดึงข้อมูล' });
@@ -85,7 +107,9 @@ export const GoogleSheetsModal: React.FC<GoogleSheetsModalProps> = ({
 
   const handleCopyAppsScript = async () => {
     try {
-      const scriptCode = `// Google Apps Script Backend for Webapp Post-it
+      const scriptCode = `/**
+ * Webapp Post-it Backend API (Google Apps Script + Google Sheets)
+ */
 const SHEET_NAME = 'PostIts';
 const HEADERS = ['id', 'title', 'content', 'category', 'color', 'tags', 'isPinned', 'isCompleted', 'glowColor', 'createdAt', 'updatedAt'];
 
@@ -95,7 +119,8 @@ function getOrCreateSheet() {
   if (!sheet) {
     sheet = ss.insertSheet(SHEET_NAME);
     sheet.appendRow(HEADERS);
-    sheet.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold').setBackground('#FFF2B2');
+    const headerRange = sheet.getRange(1, 1, 1, HEADERS.length);
+    headerRange.setFontWeight('bold').setBackground('#FEF08A').setFontColor('#713F12');
     sheet.setFrozenRows(1);
   }
   return sheet;
@@ -103,51 +128,80 @@ function getOrCreateSheet() {
 
 function doGet(e) {
   try {
+    const params = e && e.parameter ? e.parameter : {};
+    const action = params.action || 'getNotes';
+    if (action === 'ping') {
+      return jsonResponse({ status: 'success', message: 'API is live', timestamp: new Date().toISOString() });
+    }
     const sheet = getOrCreateSheet();
     const data = sheet.getDataRange().getValues();
-    if (data.length <= 1) return jsonResponse({ status: 'success', notes: [] });
+    if (data.length <= 1) return jsonResponse({ status: 'success', count: 0, notes: [] });
     const notes = [];
     for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      if (!row[0]) continue;
+      const r = data[i];
+      if (!r[0]) continue;
       let tags = [];
-      try { tags = row[5] ? JSON.parse(row[5]) : []; } catch(e) { tags = row[5] ? String(row[5]).split(',') : []; }
+      try { tags = r[5] ? JSON.parse(r[5]) : []; } catch(err) { tags = r[5] ? String(r[5]).split(',') : []; }
       notes.push({
-        id: String(row[0]),
-        title: String(row[1] || ''),
-        content: String(row[2] || ''),
-        category: String(row[3] || 'Ideas'),
-        color: String(row[4] || 'yellow'),
-        tags: Array.isArray(tags) ? tags : [],
-        isPinned: Boolean(row[6]),
-        isCompleted: Boolean(row[7]),
-        glowColor: String(row[8] || 'blue'),
-        createdAt: row[9] ? String(row[9]) : new Date().toISOString(),
-        updatedAt: row[10] ? String(row[10]) : new Date().toISOString()
+        id: String(r[0]), title: String(r[1] || ''), content: String(r[2] || ''),
+        category: String(r[3] || 'Ideas'), color: String(r[4] || 'yellow'),
+        tags: Array.isArray(tags) ? tags : [], isPinned: Boolean(r[6]), isCompleted: Boolean(r[7]),
+        glowColor: String(r[8] || 'purple'), createdAt: r[9] || new Date().toISOString(), updatedAt: r[10] || new Date().toISOString()
       });
     }
-    return jsonResponse({ status: 'success', notes: notes });
-  } catch(err) {
+    return jsonResponse({ status: 'success', count: notes.length, notes: notes });
+  } catch (err) {
     return jsonResponse({ status: 'error', message: err.toString() });
   }
 }
 
 function doPost(e) {
+  const lock = LockService.getScriptLock();
   try {
-    const contents = e.postData ? e.postData.contents : null;
+    if (!lock.tryLock(10000)) return jsonResponse({ status: 'error', message: 'Server busy' });
+    const contents = e && e.postData ? e.postData.contents : null;
     if (!contents) return jsonResponse({ status: 'error', message: 'No payload' });
     const payload = JSON.parse(contents);
+    const action = payload.action || 'sync';
     const sheet = getOrCreateSheet();
-    if (payload.action === 'sync') {
+    const now = new Date().toISOString();
+
+    if (action === 'create') {
+      const n = payload.note;
+      const noteId = n.id || ('note-' + new Date().getTime());
+      sheet.appendRow([noteId, n.title || '', n.content || '', n.category || 'Ideas', n.color || 'yellow', JSON.stringify(n.tags || []), Boolean(n.isPinned), Boolean(n.isCompleted), n.glowColor || 'purple', n.createdAt || now, n.updatedAt || now]);
+      return jsonResponse({ status: 'success', message: 'Created', note: { ...n, id: noteId } });
+    }
+
+    if (action === 'update') {
+      const n = payload.note;
+      const targetId = (n && n.id) || payload.id;
+      const data = sheet.getRange(1, 1, sheet.getLastRow(), 1).getValues();
+      let rowIndex = -1;
+      for (let i = 1; i < data.length; i++) {
+        if (String(data[i][0]) === String(targetId)) { rowIndex = i + 1; break; }
+      }
+      if (rowIndex === -1) return jsonResponse({ status: 'error', message: 'Not found' });
+      const old = sheet.getRange(rowIndex, 1, 1, HEADERS.length).getValues()[0];
+      sheet.getRange(rowIndex, 1, 1, HEADERS.length).setValues([[targetId, n.title !== undefined ? n.title : old[1], n.content !== undefined ? n.content : old[2], n.category !== undefined ? n.category : old[3], n.color !== undefined ? n.color : old[4], n.tags !== undefined ? JSON.stringify(n.tags) : old[5], n.isPinned !== undefined ? Boolean(n.isPinned) : old[6], n.isCompleted !== undefined ? Boolean(n.isCompleted) : old[7], n.glowColor !== undefined ? n.glowColor : old[8], old[9] || now, now]]);
+      return jsonResponse({ status: 'success', message: 'Updated', id: targetId });
+    }
+
+    if (action === 'delete') {
+      const targetId = payload.id;
+      const data = sheet.getRange(1, 1, sheet.getLastRow(), 1).getValues();
+      for (let i = 1; i < data.length; i++) {
+        if (String(data[i][0]) === String(targetId)) { sheet.deleteRow(i + 1); return jsonResponse({ status: 'success', message: 'Deleted' }); }
+      }
+      return jsonResponse({ status: 'error', message: 'Not found' });
+    }
+
+    if (action === 'sync') {
       const notes = payload.notes || [];
       const lastRow = sheet.getLastRow();
       if (lastRow > 1) sheet.deleteRows(2, lastRow - 1);
       if (notes.length > 0) {
-        const rows = notes.map(n => [
-          n.id, n.title || '', n.content || '', n.category || 'Ideas', n.color || 'yellow',
-          JSON.stringify(n.tags || []), Boolean(n.isPinned), Boolean(n.isCompleted),
-          n.glowColor || 'blue', n.createdAt || new Date().toISOString(), n.updatedAt || new Date().toISOString()
-        ]);
+        const rows = notes.map(n => [n.id, n.title || '', n.content || '', n.category || 'Ideas', n.color || 'yellow', JSON.stringify(n.tags || []), Boolean(n.isPinned), Boolean(n.isCompleted), n.glowColor || 'purple', n.createdAt || now, n.updatedAt || now]);
         sheet.getRange(2, 1, rows.length, HEADERS.length).setValues(rows);
       }
       return jsonResponse({ status: 'success', message: \`Synced \${notes.length} notes\` });
@@ -155,6 +209,8 @@ function doPost(e) {
     return jsonResponse({ status: 'error', message: 'Unknown action' });
   } catch(err) {
     return jsonResponse({ status: 'error', message: err.toString() });
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -183,10 +239,10 @@ function jsonResponse(data) {
             </div>
             <div>
               <h2 className="text-lg font-bold text-zinc-900 dark:text-white leading-tight">
-                เชื่อมต่อฐานข้อมูล Google Sheets
+                เชื่อมต่อฐานข้อมูล Google Sheets API
               </h2>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                ซิงค์โพสต์อิทแบบ Real-time เก็บข้อมูลฟรี 100% บนคลาวด์ของคุณเอง
+                Google Apps Script Backend API • อ่าน/เขียน/ลบ ข้อมูล Real-time ฟรีตลอดชีพ
               </p>
             </div>
           </div>
@@ -217,9 +273,20 @@ function jsonResponse(data) {
 
           {/* Web App URL Input */}
           <div>
-            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-              Google Apps Script Web App URL
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                Google Apps Script Web App URL
+              </label>
+              <button
+                type="button"
+                onClick={handlePing}
+                disabled={status.type === 'loading' || !url.trim()}
+                className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-semibold disabled:opacity-50"
+              >
+                <Activity className="w-3.5 h-3.5" />
+                <span>ทดสอบเชื่อมต่อ (Ping)</span>
+              </button>
+            </div>
             <input
               type="url"
               value={url}
@@ -258,7 +325,7 @@ function jsonResponse(data) {
             <div className="flex items-center justify-between">
               <span className="font-semibold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
                 <Database className="w-4 h-4 text-emerald-500" />
-                วิธีสร้าง Web App Script (ทำเพียงครั้งเดียว):
+                วิธีติดตั้ง Google Apps Script Backend (ทำเพียงครั้งเดียว):
               </span>
               <button
                 onClick={handleCopyAppsScript}
@@ -276,22 +343,24 @@ function jsonResponse(data) {
               <li>กดปุ่ม <strong>ทำให้ใช้งานได้ (Deploy) &gt; การปรับใช้รายการใหม่ (New deployment)</strong></li>
               <li>เลือกประเภท: <strong>เว็บแอปพลิเคชัน (Web app)</strong></li>
               <li>ผู้มีสิทธิ์เข้าถึง (Who has access): เลือกเป็น <strong>ทุกคน (Anyone)</strong> (สำคัญมาก)</li>
-              <li>กด Deploy แล้วคัดลอก URL ที่ลงท้ายด้วย <code>/exec</code> มาใส่ในช่องด้านบนได้เลย!</li>
+              <li>กด Deploy แล้วคัดลอก URL ที่ลงท้ายด้วย <code>/exec</code> มาใส่ในช่องด้านบน แล้วกดทดสอบ (Ping) ได้เลย!</li>
             </ol>
           </div>
 
-          {/* Database Comparison Advice */}
-          <div className="p-3 rounded-xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-[11px] text-amber-900 dark:text-amber-300 space-y-1">
-            <span className="font-bold">💡 คำแนะนำเรื่องฐานข้อมูล:</span>
-            <p>
-              • <strong>Google Sheets:</strong> เหมาะมากสำหรับการใช้งานส่วนตัว หรือทำงานร่วมกันกับทีม เพราะเปิดดู แก้ไข หรือ Export ข้อมูลเป็น Excel ได้ง่ายมาก โดยไม่มีค่าใช้จ่าย
-            </p>
-            <p>
-              • <strong>LocalStorage (ปัจจุบัน):</strong> บันทึกบนเบราว์เซอร์ของคุณทันทีอัตโนมัติ รวดเร็ว และใช้งานออฟไลน์ได้ 100%
-            </p>
-            <p>
-              • <strong>Supabase / Firebase:</strong> หากในอนาคตต้องการระบบ User Login หลายคน หรือ Real-time Sync มิลลิวินาที สามารถสลับไปใช้ Supabase ได้ทันที
-            </p>
+          {/* API Endpoints Info */}
+          <div className="p-3.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs space-y-2">
+            <span className="font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
+              <Code2 className="w-3.5 h-3.5 text-blue-500" />
+              API Endpoints ที่พร้อมใช้งานใน Code.gs:
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px] font-mono text-zinc-600 dark:text-zinc-400">
+              <div><code>GET ?action=getNotes</code> : อ่านโน้ตทั้งหมด</div>
+              <div><code>GET ?action=ping</code> : ตรวจสอบสถานะ API</div>
+              <div><code>POST action=create</code> : เพิ่มโพสต์อิทใหม่</div>
+              <div><code>POST action=update</code> : แก้ไขข้อมูลโพสต์อิท</div>
+              <div><code>POST action=delete</code> : ลบโพสต์อิทตาม ID</div>
+              <div><code>POST action=sync</code> : ซิงค์ข้อมูลทั้งหมด</div>
+            </div>
           </div>
 
         </div>
