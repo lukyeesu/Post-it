@@ -42,6 +42,60 @@ export function App() {
     }
   }, [darkMode]);
 
+  // 1.1 Custom & Deleted Boards & Categories State (Persisted in LocalStorage)
+  const [customCategories, setCustomCategories] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('webapp_post_it_custom_categories_v1');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [deletedCategories, setDeletedCategories] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('webapp_post_it_deleted_categories_v1');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [customBoards, setCustomBoards] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('webapp_post_it_custom_boards_v1');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [deletedBoards, setDeletedBoards] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('webapp_post_it_deleted_boards_v1');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Sync boards and categories to localStorage
+  useEffect(() => {
+    localStorage.setItem('webapp_post_it_custom_categories_v1', JSON.stringify(customCategories));
+  }, [customCategories]);
+
+  useEffect(() => {
+    localStorage.setItem('webapp_post_it_deleted_categories_v1', JSON.stringify(deletedCategories));
+  }, [deletedCategories]);
+
+  useEffect(() => {
+    localStorage.setItem('webapp_post_it_custom_boards_v1', JSON.stringify(customBoards));
+  }, [customBoards]);
+
+  useEffect(() => {
+    localStorage.setItem('webapp_post_it_deleted_boards_v1', JSON.stringify(deletedBoards));
+  }, [deletedBoards]);
+
   // Persist notes to localStorage
   useEffect(() => {
     storageService.saveNotes(notes);
@@ -113,12 +167,10 @@ export function App() {
 
   // 5. Boards calculation (e.g. กีฬา, งาน, ทั่วไป)
   const allBooks = useMemo(() => {
-    const defaults = ['กีฬา', 'งาน', 'ทั่วไป'];
-    const custom = notes
-      .map((n) => n.book || 'ทั่วไป')
-      .filter((b) => b && !defaults.includes(b));
-    return Array.from(new Set([...defaults, ...custom]));
-  }, [notes]);
+    const fromNotes = notes.map((n) => n.book || 'ทั่วไป').filter(Boolean);
+    const combined = Array.from(new Set(['ทั่วไป', ...fromNotes, ...customBoards]));
+    return combined.filter((b) => b === 'ทั่วไป' || !deletedBoards.includes(b));
+  }, [notes, customBoards, deletedBoards]);
 
   const bookCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -129,11 +181,23 @@ export function App() {
     return counts;
   }, [notes]);
 
-  // 6. Categories list calculation: dynamically derived from DB notes
+  // 6. Categories list calculation: dynamically derived from DB notes and custom categories
   const allCategoriesGlobal = useMemo(() => {
-    const defaultCats = ['Work', 'Ideas', 'Todo', 'Personal'];
-    const custom = notes.map((n) => n.category).filter(Boolean);
-    return Array.from(new Set([...defaultCats, ...custom]));
+    const fromNotes = notes.map((n) => n.category).filter(Boolean);
+    const combined = Array.from(new Set([...fromNotes, ...customCategories]));
+    const filtered = combined.filter((c) => !deletedCategories.includes(c));
+    return filtered.length > 0 ? filtered : ['ทั่วไป'];
+  }, [notes, customCategories, deletedCategories]);
+
+  // Global counts for all categories across all boards (for ManageTaxonomyModal)
+  const globalCategoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const note of notes) {
+      if (note.category) {
+        counts[note.category] = (counts[note.category] || 0) + 1;
+      }
+    }
+    return counts;
   }, [notes]);
 
   const availableCategories = useMemo(() => {
@@ -142,13 +206,11 @@ export function App() {
       : notes.filter((n) => (n.book || 'ทั่วไป') === selectedBook);
     
     const catsFromNotes = sourceNotes.map((n) => n.category).filter(Boolean);
-    const combined = Array.from(new Set(catsFromNotes));
+    const combined = Array.from(new Set([...catsFromNotes, ...customCategories]));
+    const filtered = combined.filter((c) => !deletedCategories.includes(c));
     
-    if (combined.length === 0) {
-      return ['Work', 'Ideas', 'Todo', 'Personal'];
-    }
-    return combined;
-  }, [notes, selectedBook]);
+    return filtered.length > 0 ? filtered : allCategoriesGlobal;
+  }, [notes, selectedBook, customCategories, deletedCategories, allCategoriesGlobal]);
 
   // Reset category filter to 'All' when user switches boards
   const handleSelectBook = (book: string) => {
@@ -157,25 +219,35 @@ export function App() {
   };
 
   const handleAddBook = (newBookName: string) => {
-    setSelectedBook(newBookName);
+    const trimmed = newBookName.trim();
+    if (!trimmed) return;
+    setCustomBoards((prev) => Array.from(new Set([...prev, trimmed])));
+    setDeletedBoards((prev) => prev.filter((b) => b !== trimmed));
+    setSelectedBook(trimmed);
     setSelectedCategory('All');
-    showToast(`เปิดบอร์ด "${newBookName}" แล้ว`);
+    showToast(`เปิดบอร์ด "${trimmed}" แล้ว`);
   };
 
   // 7. Board Management Handlers (Rename & Delete)
   const handleRenameBoard = (oldName: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) return;
+
+    setCustomBoards((prev) => prev.map((b) => (b === oldName ? trimmed : b)));
+    setDeletedBoards((prev) => [...prev.filter((b) => b !== trimmed), oldName]);
+
     const updatedNotes = notes.map((n) => {
       const currentBook = n.book || 'ทั่วไป';
       if (currentBook === oldName) {
-        return { ...n, book: newName, updatedAt: new Date().toISOString() };
+        return { ...n, book: trimmed, updatedAt: new Date().toISOString() };
       }
       return n;
     });
     setNotes(updatedNotes);
     if (selectedBook === oldName) {
-      setSelectedBook(newName);
+      setSelectedBook(trimmed);
     }
-    showToast(`เปลี่ยนชื่อบอร์ดเป็น "${newName}" แล้ว`);
+    showToast(`เปลี่ยนชื่อบอร์ดเป็น "${trimmed}" แล้ว`);
 
     // Sync with Google Sheets
     const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
@@ -190,6 +262,10 @@ export function App() {
       showToast('ไม่สามารถลบบอร์ดทั่วไปได้');
       return;
     }
+
+    setDeletedBoards((prev) => Array.from(new Set([...prev, boardName])));
+    setCustomBoards((prev) => prev.filter((b) => b !== boardName));
+
     // Reassign all notes in this board to 'ทั่วไป'
     const updatedNotes = notes.map((n) => {
       const currentBook = n.book || 'ทั่วไป';
@@ -214,17 +290,23 @@ export function App() {
 
   // 8. Category Management Handlers (Rename & Delete)
   const handleRenameCategory = (oldName: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) return;
+
+    setCustomCategories((prev) => prev.map((c) => (c === oldName ? trimmed : c)));
+    setDeletedCategories((prev) => [...prev.filter((c) => c !== trimmed), oldName]);
+
     const updatedNotes = notes.map((n) => {
       if (n.category === oldName) {
-        return { ...n, category: newName, updatedAt: new Date().toISOString() };
+        return { ...n, category: trimmed, updatedAt: new Date().toISOString() };
       }
       return n;
     });
     setNotes(updatedNotes);
     if (selectedCategory === oldName) {
-      setSelectedCategory(newName);
+      setSelectedCategory(trimmed);
     }
-    showToast(`เปลี่ยนชื่อหมวดหมู่เป็น "${newName}" แล้ว`);
+    showToast(`เปลี่ยนชื่อหมวดหมู่เป็น "${trimmed}" แล้ว`);
 
     // Sync with Google Sheets
     const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
@@ -235,30 +317,53 @@ export function App() {
   };
 
   const handleDeleteCategory = (catName: string) => {
-    // Reassign all notes in this category to 'Ideas'
-    const updatedNotes = notes.map((n) => {
-      if (n.category === catName) {
-        return { ...n, category: 'Ideas', updatedAt: new Date().toISOString() };
-      }
-      return n;
-    });
-    setNotes(updatedNotes);
+    setDeletedCategories((prev) => Array.from(new Set([...prev, catName])));
+    setCustomCategories((prev) => prev.filter((c) => c !== catName));
+
+    // Find fallback category for any notes in this category
+    const remainingCats = allCategoriesGlobal.filter((c) => c !== catName);
+    const fallbackCategory = remainingCats.length > 0 ? remainingCats[0] : 'ทั่วไป';
+
+    const hasNotes = notes.some((n) => n.category === catName);
+    let updatedNotes = notes;
+
+    if (hasNotes) {
+      updatedNotes = notes.map((n) => {
+        if (n.category === catName) {
+          return { ...n, category: fallbackCategory, updatedAt: new Date().toISOString() };
+        }
+        return n;
+      });
+      setNotes(updatedNotes);
+    }
+
     if (selectedCategory === catName) {
       setSelectedCategory('All');
     }
-    showToast(`ลบหมวดหมู่ "${catName}" แล้ว (ย้ายโน้ตไป Ideas)`);
 
-    // Sync with Google Sheets
-    const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
-    setSyncStatus('syncing');
-    storageService.syncToGoogleSheets(targetUrl, updatedNotes)
-      .then(() => setSyncStatus('connected'))
-      .catch(() => setSyncStatus('connected'));
+    showToast(
+      hasNotes
+        ? `ลบหมวดหมู่ "${catName}" แล้ว (ย้ายโน้ตไปหมวด "${fallbackCategory}")`
+        : `ลบหมวดหมู่ "${catName}" แล้ว`
+    );
+
+    if (hasNotes) {
+      // Sync with Google Sheets
+      const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
+      setSyncStatus('syncing');
+      storageService.syncToGoogleSheets(targetUrl, updatedNotes)
+        .then(() => setSyncStatus('connected'))
+        .catch(() => setSyncStatus('connected'));
+    }
   };
 
   const handleAddCategoryGlobal = (newCat: string) => {
-    setSelectedCategory(newCat);
-    showToast(`สร้างหมวดหมู่ "${newCat}" แล้ว`);
+    const trimmed = newCat.trim();
+    if (!trimmed) return;
+    setCustomCategories((prev) => Array.from(new Set([...prev, trimmed])));
+    setDeletedCategories((prev) => prev.filter((c) => c !== trimmed));
+    setSelectedCategory(trimmed);
+    showToast(`สร้างหมวดหมู่ "${trimmed}" แล้ว`);
   };
 
   // Category counts within current board view
@@ -365,6 +470,14 @@ export function App() {
   const handleSaveNote = (noteData: Omit<PostItNote, 'id' | 'createdAt' | 'updatedAt'>, id?: string) => {
     const now = new Date().toISOString();
     const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
+
+    // If user explicitly created or assigned a category/book, remove from deleted list
+    if (noteData.category) {
+      setDeletedCategories((prev) => prev.filter((c) => c !== noteData.category));
+    }
+    if (noteData.book) {
+      setDeletedBoards((prev) => prev.filter((b) => b !== noteData.book));
+    }
 
     if (id) {
       // Update
@@ -583,7 +696,7 @@ export function App() {
         }}
         onSave={handleSaveNote}
         editingNote={editingNote}
-        categories={availableCategories}
+        categories={allCategoriesGlobal}
         books={allBooks}
         defaultBook={selectedBook !== 'All' ? selectedBook : 'ทั่วไป'}
       />
@@ -595,7 +708,7 @@ export function App() {
         books={allBooks}
         categories={allCategoriesGlobal}
         bookCounts={bookCounts}
-        categoryCounts={categoryCounts}
+        categoryCounts={globalCategoryCounts}
         onRenameBoard={handleRenameBoard}
         onDeleteBoard={handleDeleteBoard}
         onAddBoard={handleAddBook}

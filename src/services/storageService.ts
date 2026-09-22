@@ -86,7 +86,14 @@ export const storageService = {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const data = await response.json();
+    const text = await response.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error('ไม่สามารถแปลงข้อมูล JSON จาก Google Sheets ได้');
+    }
+
     if (data.status === 'success' && Array.isArray(data.notes)) {
       return data.notes.map((n: PostItNote) => ({
         ...n,

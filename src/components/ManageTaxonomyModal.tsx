@@ -84,14 +84,24 @@ export const ManageTaxonomyModal: React.FC<ManageTaxonomyModalProps> = ({
 
   const handleDeleteBoardClick = (board: string) => {
     if (board === 'ทั่วไป') return;
-    if (window.confirm(`คุณต้องการลบบอร์ด "${board}" ใช่หรือไม่?\n\n* โน้ตในบอร์ดนี้จะไม่สูญหาย แต่จะถูกย้ายไปเก็บที่บอร์ด "ทั่วไป" อัตโนมัติ`)) {
+    const count = bookCounts[board] || 0;
+    const confirmMsg = count > 0
+      ? `คุณต้องการลบบอร์ด "${board}" ใช่หรือไม่?\n\n* โน้ตในบอร์ดนี้ (${count} รายการ) จะถูกย้ายไปเก็บที่บอร์ด "ทั่วไป" อัตโนมัติ ไม่สูญหาย`
+      : `คุณต้องการลบบอร์ด "${board}" ใช่หรือไม่?`;
+    if (window.confirm(confirmMsg)) {
       onDeleteBoard(board);
+      cancelEdit();
     }
   };
 
   const handleDeleteCategoryClick = (cat: string) => {
-    if (window.confirm(`คุณต้องการลบหมวดหมู่ "${cat}" ใช่หรือไม่?\n\n* การ์ดโพสต์อิทจะไม่สูญหาย แต่จะถูกย้ายไปรวมที่หมวดหมู่ "Ideas" อัตโนมัติ`)) {
+    const count = categoryCounts[cat] || 0;
+    const confirmMsg = count > 0
+      ? `คุณต้องการลบหมวดหมู่ "${cat}" ใช่หรือไม่?\n\n* โน้ตในหมวดหมู่นี้ (${count} รายการ) จะถูกย้ายไปที่หมวดหมู่อื่นอัตโนมัติ ไม่สูญหาย`
+      : `คุณต้องการลบหมวดหมู่ "${cat}" ใช่หรือไม่?`;
+    if (window.confirm(confirmMsg)) {
       onDeleteCategory(cat);
+      cancelEdit();
     }
   };
 

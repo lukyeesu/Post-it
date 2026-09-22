@@ -35,7 +35,7 @@ export const PostItModal: React.FC<PostItModalProps> = ({
   const [content, setContent] = useState('');
   const [book, setBook] = useState(defaultBook);
   const [customBook, setCustomBook] = useState('');
-  const [category, setCategory] = useState('Ideas');
+  const [category, setCategory] = useState(categories[0] || 'ทั่วไป');
   const [customCategory, setCustomCategory] = useState('');
   const [color, setColor] = useState<NoteColor>('sand');
   const [tagInput, setTagInput] = useState('');
@@ -57,13 +57,13 @@ export const PostItModal: React.FC<PostItModalProps> = ({
       setContent('');
       setBook(defaultBook !== 'All' ? defaultBook : (books[0] || 'ทั่วไป'));
       setCustomBook('');
-      setCategory('Ideas');
+      setCategory(categories[0] || 'ทั่วไป');
       setCustomCategory('');
       setColor('sand');
       setTagInput('');
       setIsPinned(false);
     }
-  }, [editingNote, isOpen, defaultBook, books]);
+  }, [editingNote, isOpen, defaultBook, books, categories]);
 
   if (!isOpen) return null;
 
