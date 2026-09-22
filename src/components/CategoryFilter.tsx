@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pin, CheckCircle2, LayoutGrid, Layers, Edit2, Trash2 } from 'lucide-react';
+import { Pin, CheckCircle2, LayoutGrid, Layers } from 'lucide-react';
 
 interface CategoryFilterProps {
   selectedBook: string;
@@ -23,8 +23,6 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
   categories,
   selectedCategory,
   onSelectCategory,
-  onRenameCategory,
-  onDeleteCategory,
   showPinnedOnly,
   onTogglePinnedOnly,
   showCompletedOnly,
@@ -34,20 +32,6 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
   filteredCount,
   pinnedCount,
 }) => {
-  const handleInlineRenameCategory = () => {
-    if (selectedCategory === 'All') return;
-    const newName = window.prompt(`แก้ไขชื่อหมวดหมู่ "${selectedCategory}" เป็น:`, selectedCategory);
-    if (newName && newName.trim() && newName.trim() !== selectedCategory) {
-      onRenameCategory?.(selectedCategory, newName.trim());
-    }
-  };
-
-  const handleInlineDeleteCategory = () => {
-    if (selectedCategory === 'All') return;
-    if (window.confirm(`คุณต้องการลบหมวดหมู่ "${selectedCategory}" ใช่หรือไม่?\n(โน้ตในหมวดหมู่นี้จะถูกย้ายไปที่หมวดหมู่ "Ideas")`)) {
-      onDeleteCategory?.(selectedCategory);
-    }
-  };
 
   return (
     <div className="w-full mb-6">
@@ -65,29 +49,6 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
             <Layers className="w-3.5 h-3.5 text-[#8A857D]" />
             <span>หมวดหมู่: {selectedCategory === 'All' ? 'ทั้งหมด' : selectedCategory}</span>
           </span>
-
-          {/* Quick Actions for Selected Category */}
-          {selectedCategory !== 'All' && (
-            <div className="flex items-center gap-0.5 ml-1">
-              <button
-                type="button"
-                onClick={handleInlineRenameCategory}
-                className="p-1 rounded-md text-[#7A756E] hover:text-[#2D2824] hover:bg-[#EFECE6] dark:hover:bg-[#2A2725] transition-colors"
-                title={`แก้ไขชื่อหมวดหมู่ ${selectedCategory}`}
-              >
-                <Edit2 className="w-3 h-3" />
-              </button>
-
-              <button
-                type="button"
-                onClick={handleInlineDeleteCategory}
-                className="p-1 rounded-md text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
-                title={`ลบหมวดหมู่ ${selectedCategory}`}
-              >
-                <Trash2 className="w-3 h-3" />
-              </button>
-            </div>
-          )}
         </div>
 
         <span className="text-zinc-400">›</span>
