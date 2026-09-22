@@ -14,8 +14,7 @@ export const storageService = {
     try {
       const data = localStorage.getItem(STORAGE_KEY);
       if (!data) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(initialNotes));
-        return initialNotes;
+        return [];
       }
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed)) {
@@ -24,10 +23,10 @@ export const storageService = {
           book: n.book && n.book.trim() ? n.book : 'ทั่วไป',
         }));
       }
-      return initialNotes;
+      return [];
     } catch (err) {
       console.error('Error loading notes from localStorage:', err);
-      return initialNotes;
+      return [];
     }
   },
 

@@ -65,17 +65,13 @@ export function App() {
         const remoteNotes = await storageService.fetchFromGoogleSheets(targetUrl);
         if (!isMounted) return;
 
-        if (Array.isArray(remoteNotes) && remoteNotes.length > 0) {
+        if (Array.isArray(remoteNotes)) {
           setNotes(remoteNotes);
           storageService.saveNotes(remoteNotes);
           setSyncStatus('connected');
-          showToast(`เชื่อมต่อ Google Sheets แล้ว (พบข้อมูล ${remoteNotes.length} รายการ) ☁️`);
-        } else {
-          // If remote sheet is empty but local has notes, upload local notes to initialize sheet
-          if (notes.length > 0) {
-            await storageService.syncToGoogleSheets(targetUrl, notes);
+          if (remoteNotes.length > 0) {
+            showToast(`เชื่อมต่อ Google Sheets แล้ว (พบข้อมูล ${remoteNotes.length} รายการ) ☁️`);
           }
-          setSyncStatus('connected');
         }
       } catch (err) {
         console.warn('Initial fetch from Google Sheets:', err);
@@ -133,9 +129,9 @@ export function App() {
     return counts;
   }, [notes]);
 
-  // 6. Categories list calculation
+  // 6. Categories list calculation: dynamically derived from DB notes
   const allCategoriesGlobal = useMemo(() => {
-    const defaultCats = ['Work', 'Ideas', 'Todo', 'Personal', 'Focus', 'ฟุตบอล', 'วิ่ง', 'ไก่ชน'];
+    const defaultCats = ['Work', 'Ideas', 'Todo', 'Personal'];
     const custom = notes.map((n) => n.category).filter(Boolean);
     return Array.from(new Set([...defaultCats, ...custom]));
   }, [notes]);
@@ -146,7 +142,7 @@ export function App() {
       : notes.filter((n) => (n.book || 'ทั่วไป') === selectedBook);
     
     const catsFromNotes = sourceNotes.map((n) => n.category).filter(Boolean);
-    const combined = Array.from(new Set([...catsFromNotes]));
+    const combined = Array.from(new Set(catsFromNotes));
     
     if (combined.length === 0) {
       return ['Work', 'Ideas', 'Todo', 'Personal'];
