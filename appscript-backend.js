@@ -50,11 +50,64 @@ const HEADERS = [
   'book'         // L: เล่มหนังสือ (เช่น กีฬา, งาน, ทั่วไป)
 ];
 
+// (ทางเลือก) หากสร้าง Apps Script แยกต่างหากที่ script.google.com (Standalone) 
+// สามารถใส่ ID ของ Google Sheets ที่ต้องการเชื่อมต่อลงในนี้ได้ เช่น: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms'
+// หรือปล่อยว่างไว้ ระบบจะเชื่อมต่อกับ Sheet ปัจจุบัน หรือสร้างให้อัตโนมัติ
+const SPREADSHEET_ID = '';
+
+/**
+ * ฟังก์ชันดึงสเปรดชีต (รองรับทั้งเปิดจาก Google Sheets หรือ Standalone Apps Script)
+ */
+function getSpreadsheet() {
+  // 1. ลองดึงจาก Google Sheet ที่ผูกกับ Script (Container-bound)
+  try {
+    const active = SpreadsheetApp.getActiveSpreadsheet();
+    if (active) return active;
+  } catch (err) {
+    Logger.log('Active spreadsheet not accessible: ' + err);
+  }
+
+  // 2. ถ้ามีการระบุ SPREADSHEET_ID ไว้
+  if (typeof SPREADSHEET_ID !== 'undefined' && SPREADSHEET_ID && SPREADSHEET_ID.trim()) {
+    try {
+      return SpreadsheetApp.openById(SPREADSHEET_ID.trim());
+    } catch (err) {
+      Logger.log('openById with SPREADSHEET_ID failed: ' + err);
+    }
+  }
+
+  // 3. ตรวจสอบ Script Properties ว่าเคยสร้างและจำ ID ไว้หรือไม่
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const savedId = props.getProperty('POST_IT_SHEET_ID');
+    if (savedId) {
+      return SpreadsheetApp.openById(savedId);
+    }
+  } catch (err) {
+    Logger.log('openById with savedId failed: ' + err);
+  }
+
+  // 4. กรณีเป็น Standalone Script และยังไม่มี Sheet: สร้างไฟล์ Google Sheets ใหม่ใน Drive อัตโนมัติ!
+  try {
+    const newSs = SpreadsheetApp.create('Post-it Database');
+    const props = PropertiesService.getScriptProperties();
+    props.setProperty('POST_IT_SHEET_ID', newSs.getId());
+    Logger.log('Created new Spreadsheet automatically: ' + newSs.getUrl());
+    return newSs;
+  } catch (err) {
+    throw new Error('ไม่สามารถเข้าถึงหรือสร้าง Google Sheet ได้ กรุณาเปิด Script จาก Google Sheet โดยตรง หรือระบุ SPREADSHEET_ID: ' + err.toString());
+  }
+}
+
 /**
  * ฟังก์ชันสร้างหรือดึงชีตสำหรับเก็บ Post-it พร้อมจัดรูปแบบตารางอัตโนมัติ
  */
 function getOrCreateSheet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getSpreadsheet();
+  if (!ss) {
+    throw new Error('ไม่พบสเปรดชีต Google Sheets');
+  }
+
   let sheet = ss.getSheetByName(SHEET_NAME);
   
   if (!sheet) {
@@ -114,9 +167,15 @@ function doGet(e) {
 
     // 1. Health Check / Ping
     if (action === 'ping') {
+      let sheetUrl = '';
+      try {
+        const ss = getSpreadsheet();
+        sheetUrl = ss ? ss.getUrl() : '';
+      } catch (e) {}
       return jsonResponse({
         status: 'success',
         message: 'Post-it Google Sheets API is running perfectly!',
+        sheetUrl: sheetUrl,
         timestamp: new Date().toISOString()
       });
     }

@@ -5,7 +5,10 @@ import {
   Sun, 
   Search, 
   X,
-  StickyNote
+  StickyNote,
+  Cloud,
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -15,6 +18,8 @@ interface NavbarProps {
   darkMode: boolean;
   onToggleDarkMode: () => void;
   totalNotes: number;
+  syncStatus: 'idle' | 'syncing' | 'connected' | 'error';
+  onSyncNow: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -24,6 +29,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   darkMode,
   onToggleDarkMode,
   totalNotes,
+  syncStatus,
+  onSyncNow,
 }) => {
   return (
     <header className="sticky top-0 z-40 w-full backdrop-blur-md bg-[#FAF8F5]/90 dark:bg-[#1D1B1A]/90 border-b border-[#E8E4DC] dark:border-[#33312E] transition-colors">
@@ -68,7 +75,45 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Actions (Comfortable Touch Targets) */}
-        <div className="flex items-center gap-2.5 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Cloud Sync Button */}
+          <button
+            type="button"
+            onClick={onSyncNow}
+            disabled={syncStatus === 'syncing'}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs sm:text-sm font-medium border transition-all ${
+              syncStatus === 'syncing'
+                ? 'bg-[#EFECE6] dark:bg-[#2A2725] text-[#8A857D] border-[#DDD8CE] dark:border-[#3E3A36]'
+                : syncStatus === 'error'
+                ? 'bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900'
+                : 'text-[#6B665F] dark:text-[#A39E95] hover:bg-[#EFECE6] dark:hover:bg-[#2A2725] border-transparent hover:border-[#E0DBD0] dark:hover:border-[#363330]'
+            }`}
+            title={
+              syncStatus === 'syncing'
+                ? 'กำลังเชื่อมต่อและซิงค์กับ Google Sheets...'
+                : syncStatus === 'error'
+                ? 'เชื่อมต่อไม่สำเร็จ คลิกเพื่อลองใหม่'
+                : 'ซิงค์ข้อมูลกับ Google Sheets'
+            }
+          >
+            {syncStatus === 'syncing' ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin text-amber-600" />
+                <span className="hidden sm:inline">กำลังซิงค์</span>
+              </>
+            ) : syncStatus === 'error' ? (
+              <>
+                <AlertCircle className="w-4 h-4" />
+                <span className="hidden sm:inline">ซิงค์ชีต</span>
+              </>
+            ) : (
+              <>
+                <Cloud className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span className="hidden sm:inline">ซิงค์ชีต</span>
+              </>
+            )}
+          </button>
+
           {/* Dark Mode Toggle */}
           <button
             onClick={onToggleDarkMode}
@@ -78,7 +123,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {darkMode ? <Sun className="w-5 h-5 text-[#D4A373]" /> : <Moon className="w-5 h-5" />}
           </button>
 
-          {/* New Note Button (Larger & Satisfying) */}
+          {/* New Note Button */}
           <button
             onClick={onOpenNewModal}
             className="flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-2xl text-sm sm:text-base font-semibold bg-[#2D2824] hover:bg-[#1C1816] text-[#FAF8F5] dark:bg-[#ECE9E4] dark:text-[#1D1B1A] dark:hover:bg-[#FFFFFF] transition-all shadow-sm active:scale-95"
