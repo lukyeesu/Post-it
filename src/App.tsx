@@ -192,9 +192,10 @@ export function App() {
     <div className="min-h-screen bg-muji-grid flex flex-col selection:bg-[#EAE6DE] selection:text-[#2D2824]">
       
       {/* Toast Notification (Minimalist Muji Style) */}
+      {/* Toast Notification (Comfortable pill) */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-[#2D2824] text-[#FAF8F5] dark:bg-[#ECE9E4] dark:text-[#1D1B1A] shadow-lg border border-black/10 dark:border-white/10 text-xs font-medium animate-slideUp">
-          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-600" />
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-[#2D2824] text-[#FAF8F5] dark:bg-[#ECE9E4] dark:text-[#1D1B1A] shadow-xl border border-black/10 dark:border-white/10 text-sm font-medium animate-slideUp">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 dark:text-emerald-600 stroke-[2.5]" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -229,9 +230,9 @@ export function App() {
           pinnedCount={pinnedCount}
         />
 
-        {/* Post-it Notes Grid */}
+        {/* Post-it Notes Grid (3 Columns on Large Screens for Generous Card Width) */}
         {filteredNotes.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-5 items-start">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7 items-start">
             {filteredNotes.map((note) => (
               <PostItCard
                 key={note.id}
@@ -245,30 +246,31 @@ export function App() {
           </div>
         ) : (
           /* Clean Empty State */
-          <div className="py-24 flex flex-col items-center justify-center text-center max-w-sm mx-auto">
-            <div className="w-12 h-12 rounded-2xl bg-[#EFECE6] dark:bg-[#262322] text-[#8A857D] dark:text-[#8C8780] flex items-center justify-center mb-3">
-              <StickyNote className="w-6 h-6 stroke-[1.5]" />
+          <div className="py-24 flex flex-col items-center justify-center text-center max-w-md mx-auto">
+            <div className="w-14 h-14 rounded-2xl bg-[#EFECE6] dark:bg-[#262322] text-[#8A857D] dark:text-[#8C8780] flex items-center justify-center mb-3.5 shadow-2xs">
+              <StickyNote className="w-7 h-7 stroke-[1.5]" />
             </div>
-            <h3 className="text-sm font-semibold text-[#2D2824] dark:text-[#ECE9E4] mb-1">
+            <h3 className="text-base font-bold text-[#2D2824] dark:text-[#ECE9E4] mb-1.5">
               ไม่พบโพสต์อิท
             </h3>
-            <p className="text-xs text-[#8A857D] dark:text-[#8C8780] mb-5 leading-relaxed">
+            <p className="text-sm text-[#8A857D] dark:text-[#8C8780] mb-6 leading-relaxed">
               {searchQuery
                 ? `ไม่มีข้อความที่ตรงกับ "${searchQuery}"`
-                : 'เริ่มต้นสร้างโพสต์อิทใหม่เพื่อบันทึกงานและความคิด'}
+                : 'เริ่มต้นสร้างโพสต์อิทใหม่เพื่อบันทึกงาน ไอเดีย และสิ่งที่ต้องทำ'}
             </p>
             <button
               onClick={() => {
                 setEditingNote(null);
                 setIsModalOpen(true);
               }}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-medium bg-[#2D2824] hover:bg-[#1C1816] text-[#FAF8F5] dark:bg-[#ECE9E4] dark:text-[#1D1B1A] dark:hover:bg-[#FFFFFF] transition-colors"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm sm:text-base font-semibold bg-[#2D2824] hover:bg-[#1C1816] text-[#FAF8F5] dark:bg-[#ECE9E4] dark:text-[#1D1B1A] dark:hover:bg-[#FFFFFF] transition-all shadow-sm active:scale-95"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-4.5 h-4.5 stroke-[2.5]" />
               <span>สร้างโพสต์อิท</span>
             </button>
           </div>
         )}
+
 
       </main>
 

@@ -35,7 +35,7 @@ const mujiThemes: Record<string, {
     textColor: 'text-[#2D2824] dark:text-[#ECE9E4]',
     mutedText: 'text-[#7A756E] dark:text-[#9E9990]',
     tagBg: 'bg-[#EFECE5] text-[#59544D] dark:bg-[#2F2C2A] dark:text-[#C4C0B8]',
-    spotlight: 'rgba(255, 255, 255, 0.4)',
+    spotlight: 'rgba(255, 255, 255, 0.45)',
   },
   kraft: {
     bg: 'bg-[#F3EADB] dark:bg-[#2A241F]',
@@ -43,7 +43,7 @@ const mujiThemes: Record<string, {
     textColor: 'text-[#2E271F] dark:text-[#EFE7DC]',
     mutedText: 'text-[#7D6F5E] dark:text-[#A89A8A]',
     tagBg: 'bg-[#E5D9C5] text-[#594B3C] dark:bg-[#382F28] dark:text-[#D1C3B2]',
-    spotlight: 'rgba(255, 255, 255, 0.35)',
+    spotlight: 'rgba(255, 255, 255, 0.4)',
   },
   sage: {
     bg: 'bg-[#EEF3ED] dark:bg-[#202521]',
@@ -51,7 +51,7 @@ const mujiThemes: Record<string, {
     textColor: 'text-[#242F26] dark:text-[#E4EBE5]',
     mutedText: 'text-[#6A786D] dark:text-[#90A193]',
     tagBg: 'bg-[#DEE8DC] text-[#445447] dark:bg-[#2C352E] dark:text-[#B6C7B9]',
-    spotlight: 'rgba(255, 255, 255, 0.4)',
+    spotlight: 'rgba(255, 255, 255, 0.45)',
   },
   sky: {
     bg: 'bg-[#EEF3F7] dark:bg-[#1E2428]',
@@ -59,7 +59,7 @@ const mujiThemes: Record<string, {
     textColor: 'text-[#202B33] dark:text-[#E3EBF0]',
     mutedText: 'text-[#6B7985] dark:text-[#91A2B0]',
     tagBg: 'bg-[#DEE7EE] text-[#425260] dark:bg-[#2A343B] dark:text-[#B7C7D4]',
-    spotlight: 'rgba(255, 255, 255, 0.4)',
+    spotlight: 'rgba(255, 255, 255, 0.45)',
   },
   clay: {
     bg: 'bg-[#F7EBE8] dark:bg-[#2A2120]',
@@ -67,7 +67,7 @@ const mujiThemes: Record<string, {
     textColor: 'text-[#332220] dark:text-[#EFE5E3]',
     mutedText: 'text-[#856A67] dark:text-[#B0928E]',
     tagBg: 'bg-[#EAD9D5] text-[#5E4441] dark:bg-[#382A28] dark:text-[#D4BCB8]',
-    spotlight: 'rgba(255, 255, 255, 0.35)',
+    spotlight: 'rgba(255, 255, 255, 0.4)',
   },
   ochre: {
     bg: 'bg-[#FAF2DF] dark:bg-[#29241B]',
@@ -75,7 +75,7 @@ const mujiThemes: Record<string, {
     textColor: 'text-[#332917] dark:text-[#EFE5D0]',
     mutedText: 'text-[#857352] dark:text-[#AB9A78]',
     tagBg: 'bg-[#EFE2C5] text-[#5E4F32] dark:bg-[#383021] dark:text-[#D1C3A3]',
-    spotlight: 'rgba(255, 255, 255, 0.4)',
+    spotlight: 'rgba(255, 255, 255, 0.45)',
   },
   charcoal: {
     bg: 'bg-[#2D2926] dark:bg-[#1A1817]',
@@ -83,11 +83,10 @@ const mujiThemes: Record<string, {
     textColor: 'text-[#FAF8F5] dark:text-[#ECE9E4]',
     mutedText: 'text-[#A39D96] dark:text-[#807B75]',
     tagBg: 'bg-[#3E3835] text-[#D4CEC7] dark:bg-[#262322] dark:text-[#B5AFA8]',
-    spotlight: 'rgba(255, 255, 255, 0.15)',
+    spotlight: 'rgba(255, 255, 255, 0.2)',
   },
 };
 
-// Map legacy color names to Muji palette
 function resolveTheme(color: string) {
   if (mujiThemes[color]) return mujiThemes[color];
   if (color === 'yellow' || color === 'orange') return mujiThemes.ochre;
@@ -125,9 +124,9 @@ export const PostItCard: React.FC<PostItCardProps> = ({
     e.stopPropagation();
     if (!note.isCompleted) {
       confetti({
-        particleCount: 25,
-        spread: 45,
-        origin: { y: 0.85 },
+        particleCount: 30,
+        spread: 50,
+        origin: { y: 0.8 },
       });
     }
     onToggleComplete(note.id);
@@ -140,108 +139,108 @@ export const PostItCard: React.FC<PostItCardProps> = ({
 
   return (
     <TiltSpotlightCard
-      maxTilt={8}
+      maxTilt={7}
       spotlightColor={theme.spotlight}
-      className={`border rounded-2xl p-5 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between min-h-[250px] ${theme.bg} ${theme.border}`}
+      className={`border rounded-3xl p-6 sm:p-7 shadow-xs hover:shadow-lg transition-all flex flex-col justify-between min-h-[290px] sm:min-h-[320px] ${theme.bg} ${theme.border}`}
     >
       <div>
-        {/* Top Header: Category & Actions */}
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-1.5">
-            <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full tracking-tight ${theme.tagBg}`}>
+        {/* Top Header: Category & Action Buttons */}
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2">
+            <span className={`text-xs sm:text-sm font-semibold px-3 py-1 rounded-xl tracking-tight ${theme.tagBg}`}>
               {note.category}
             </span>
             {note.isPinned && (
-              <span title="ปักหมุดไว้บนสุด">
-                <Pin className="w-3.5 h-3.5 fill-[#B45309] text-[#B45309] dark:fill-[#D97706] dark:text-[#D97706]" />
+              <span title="ปักหมุดไว้บนสุด" className="p-1">
+                <Pin className="w-4 h-4 fill-[#B45309] text-[#B45309] dark:fill-[#D97706] dark:text-[#D97706]" />
               </span>
             )}
           </div>
 
-          {/* Minimal Action Toolbar */}
-          <div className="flex items-center gap-0.5">
+          {/* Action Toolbar (Comfortable 36px touch targets) */}
+          <div className="flex items-center gap-1">
             {/* One-click Copy Button */}
             <button
               onClick={handleCopy}
-              className={`p-1.5 rounded-lg transition-all ${
+              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
                 copied
-                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 font-bold scale-105'
                   : 'hover:bg-black/5 dark:hover:bg-white/10 ' + theme.mutedText
               }`}
               title="คัดลอกข้อความในคลิกเดียว"
             >
-              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? <Check className="w-4.5 h-4.5 stroke-[2.5]" /> : <Copy className="w-4.5 h-4.5" />}
             </button>
 
             {/* Pin Toggle */}
             <button
               onClick={() => onTogglePin(note.id)}
-              className={`p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${
+              className={`w-9 h-9 rounded-xl flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${
                 note.isPinned ? 'text-[#B45309] dark:text-[#D97706]' : theme.mutedText
               }`}
               title={note.isPinned ? "ถอนหมุด" : "ปักหมุด"}
             >
-              <Pin className={`w-3.5 h-3.5 ${note.isPinned ? 'fill-current' : ''}`} />
+              <Pin className={`w-4.5 h-4.5 ${note.isPinned ? 'fill-current' : ''}`} />
             </button>
 
             {/* Edit */}
             <button
               onClick={() => onEdit(note)}
-              className={`p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${theme.mutedText}`}
+              className={`w-9 h-9 rounded-xl flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${theme.mutedText}`}
               title="แก้ไข"
             >
-              <Edit3 className="w-3.5 h-3.5" />
+              <Edit3 className="w-4.5 h-4.5" />
             </button>
 
             {/* Delete */}
             <button
               onClick={() => onDelete(note.id)}
-              className="p-1.5 rounded-lg hover:bg-rose-500/10 text-rose-500/80 hover:text-rose-600 transition-colors"
+              className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-rose-500/10 text-rose-500/80 hover:text-rose-600 transition-colors"
               title="ลบ"
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="w-4.5 h-4.5" />
             </button>
           </div>
         </div>
 
-        {/* Note Title (Clean modern typography) */}
-        <h3 className={`font-semibold text-base mb-2 leading-snug tracking-tight ${theme.textColor}`}>
+        {/* Note Title (Prominent and clear) */}
+        <h3 className={`font-bold text-lg sm:text-xl mb-2.5 leading-snug tracking-tight ${theme.textColor}`}>
           {note.title}
         </h3>
 
-        {/* Note Body (Crisp, highly legible Thai/English font) */}
-        <p className={`text-sm leading-relaxed whitespace-pre-line break-words ${theme.textColor} ${note.isCompleted ? 'line-through opacity-40' : 'opacity-90'}`}>
+        {/* Note Body (Larger, highly readable font with comfortable line height) */}
+        <p className={`text-sm sm:text-base leading-relaxed whitespace-pre-line break-words ${theme.textColor} ${note.isCompleted ? 'line-through opacity-40' : 'opacity-90'}`}>
           {note.content}
         </p>
       </div>
 
-      {/* Card Footer */}
-      <div className="mt-4 pt-3 border-t border-black/5 dark:border-white/5 flex items-center justify-between gap-2 text-xs">
+      {/* Card Footer: Date, Tags & Complete Toggle */}
+      <div className="mt-6 pt-4 border-t border-black/5 dark:border-white/5 flex items-center justify-between gap-3 text-xs sm:text-sm">
         {/* Tags / Date */}
-        <div className="flex flex-wrap items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1.5">
           {note.tags && note.tags.length > 0 ? (
             note.tags.map((tag) => (
-              <span key={tag} className={`text-[11px] px-2 py-0.5 rounded-md ${theme.tagBg}`}>
+              <span key={tag} className={`text-xs px-2.5 py-1 rounded-lg font-medium ${theme.tagBg}`}>
                 #{tag}
               </span>
             ))
           ) : (
-            <span className={`text-[11px] flex items-center gap-1 ${theme.mutedText}`}>
-              <Calendar className="w-3 h-3" /> {formattedDate}
+            <span className={`text-xs flex items-center gap-1.5 ${theme.mutedText}`}>
+              <Calendar className="w-3.5 h-3.5" /> {formattedDate}
             </span>
           )}
         </div>
 
-        {/* Complete Toggle */}
+        {/* Complete Toggle (Bigger button) */}
         <button
           onClick={handleCompleteWithConfetti}
-          className={`flex items-center gap-1 text-xs transition-colors ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all ${
             note.isCompleted 
-              ? 'text-emerald-600 dark:text-emerald-400 font-medium' 
-              : theme.mutedText + ' hover:text-[#2D2824] dark:hover:text-[#ECE9E4]'
+              ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 font-semibold' 
+              : theme.mutedText + ' hover:bg-black/5 dark:hover:bg-white/5 hover:text-[#2D2824] dark:hover:text-[#ECE9E4]'
           }`}
         >
-          <CheckCircle2 className={`w-3.5 h-3.5 ${note.isCompleted ? 'fill-emerald-100 dark:fill-emerald-950' : ''}`} />
+          <CheckCircle2 className={`w-4 h-4 ${note.isCompleted ? 'fill-emerald-200 dark:fill-emerald-800' : ''}`} />
           <span>{note.isCompleted ? 'เสร็จสิ้น' : 'ทำเสร็จ'}</span>
         </button>
       </div>
