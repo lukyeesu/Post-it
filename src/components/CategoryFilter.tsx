@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pin, CheckCircle2, BookOpen, Layers } from 'lucide-react';
+import { Pin, CheckCircle2, LayoutGrid, Layers } from 'lucide-react';
 
 interface CategoryFilterProps {
   selectedBook: string;
@@ -34,9 +34,9 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
     <div className="w-full mb-6">
       {/* Breadcrumb Hierarchy Display: Book > Category > Count */}
       <div className="flex items-center flex-wrap gap-2 text-xs sm:text-sm font-medium text-[#7A756E] dark:text-[#99948D] mb-3 px-1">
-        <span className="flex items-center gap-1 text-[#2D2824] dark:text-[#ECE9E4] font-semibold">
-          <BookOpen className="w-3.5 h-3.5 text-[#8A857D]" />
-          <span>{selectedBook === 'All' ? 'หนังสือทั้งหมด' : selectedBook}</span>
+        <span className="flex items-center gap-1.5 text-[#2D2824] dark:text-[#ECE9E4] font-semibold">
+          <LayoutGrid className="w-3.5 h-3.5 text-[#8A857D]" />
+          <span>{selectedBook === 'All' ? 'บอร์ดทั้งหมด' : selectedBook}</span>
         </span>
         <span className="text-zinc-400">›</span>
         <span className="flex items-center gap-1 text-[#2D2824] dark:text-[#ECE9E4] font-semibold">

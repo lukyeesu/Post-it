@@ -95,7 +95,7 @@ export function App() {
   const handleAddBook = (newBookName: string) => {
     setSelectedBook(newBookName);
     setSelectedCategory('All');
-    showToast(`เปิดเล่มหนังสือ "${newBookName}" แล้ว`);
+    showToast(`เปิดบอร์ด "${newBookName}" แล้ว`);
   };
 
   // Category counts within the current book view
@@ -329,7 +329,7 @@ export function App() {
               {searchQuery
                 ? `ไม่มีข้อความที่ตรงกับ "${searchQuery}"`
                 : selectedBook !== 'All'
-                ? `ยังไม่มีโน้ตในเล่ม "${selectedBook}" เริ่มต้นสร้างโพสต์อิทแรกในเล่มนี้ได้เลย`
+                ? `ยังไม่มีโน้ตในบอร์ด "${selectedBook}" เริ่มต้นสร้างโพสต์อิทแรกในบอร์ดนี้ได้เลย`
                 : 'เริ่มต้นสร้างโพสต์อิทใหม่เพื่อบันทึกงาน ไอเดีย และสิ่งที่ต้องทำ'}
             </p>
             <button

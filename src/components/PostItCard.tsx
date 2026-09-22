@@ -7,7 +7,7 @@ import {
   Pin, 
   CheckCircle2, 
   Calendar,
-  BookOpen
+  LayoutGrid
 } from 'lucide-react';
 import { PostItNote } from '@/types/post-it';
 import { TiltSpotlightCard } from '@/components/ui/tilt-spotlight-card';
@@ -174,7 +174,7 @@ export const PostItCard: React.FC<PostItCardProps> = ({
             {/* Book > Category Hierarchy */}
             <div className="flex items-center flex-wrap gap-1.5 text-xs">
               <span className={`font-semibold px-2.5 py-1 rounded-xl flex items-center gap-1 tracking-tight ${theme.tagBg}`}>
-                <BookOpen className="w-3 h-3 opacity-70" />
+                <LayoutGrid className="w-3 h-3 opacity-70" />
                 <span>{note.book || 'ทั่วไป'}</span>
               </span>
               <span className="text-[#8A857D] dark:text-[#8C8780] font-normal">›</span>

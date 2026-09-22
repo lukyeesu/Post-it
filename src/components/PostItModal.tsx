@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Pin, Tag, BookOpen } from 'lucide-react';
+import { X, Pin, Tag, LayoutGrid } from 'lucide-react';
 import { PostItNote, NoteColor } from '@/types/post-it';
 
 interface PostItModalProps {
@@ -116,11 +116,11 @@ export const PostItModal: React.FC<PostItModalProps> = ({
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-5 max-h-[80vh] overflow-y-auto">
           
-          {/* Book (หนังสือ) Selection */}
+          {/* Board (บอร์ด / โปรเจกต์) Selection */}
           <div className="bg-[#F5F2EB]/60 dark:bg-[#262322]/60 p-4 rounded-2xl border border-[#E8E4DC] dark:border-[#363330]">
             <label className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#7A756E] dark:text-[#99948D] mb-2">
-              <BookOpen className="w-4 h-4 text-[#8A857D]" />
-              <span>เล่มหนังสือ (Book / Project)</span>
+              <LayoutGrid className="w-4 h-4 text-[#8A857D]" />
+              <span>บอร์ด / โปรเจกต์ (Board / Topic)</span>
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <select
@@ -131,7 +131,7 @@ export const PostItModal: React.FC<PostItModalProps> = ({
                 {books.map((b) => (
                   <option key={b} value={b}>{b}</option>
                 ))}
-                <option value="custom">+ เพิ่มชื่อเล่มใหม่...</option>
+                <option value="custom">+ เพิ่มบอร์ดใหม่...</option>
               </select>
 
               {book === 'custom' && (
@@ -141,7 +141,7 @@ export const PostItModal: React.FC<PostItModalProps> = ({
                   required
                   value={customBook}
                   onChange={(e) => setCustomBook(e.target.value)}
-                  placeholder="เช่น กีฬา, การเงิน, บันทึกความจำ..."
+                  placeholder="เช่น กีฬา, งาน, โปรเจกต์ใหม่..."
                   className="w-full px-4 py-2.5 rounded-xl border border-[#E0DBD0] dark:border-[#363330] bg-white dark:bg-[#262322] text-[#2D2824] dark:text-[#ECE9E4] text-sm sm:text-base focus:outline-none focus:border-[#713F12]/50 shadow-2xs"
                 />
               )}

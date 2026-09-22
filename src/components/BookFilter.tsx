@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BookOpen, Plus, X } from 'lucide-react';
+import { LayoutGrid, Plus, X } from 'lucide-react';
 
 interface BookFilterProps {
   books: string[];
@@ -33,16 +33,16 @@ export const BookFilter: React.FC<BookFilterProps> = ({
 
   return (
     <div className="w-full mb-5">
-      {/* Book Bar Header & Tabs */}
+      {/* Board Tabs Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none max-w-full">
           {/* Label */}
           <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#7A756E] dark:text-[#99948D] mr-1 shrink-0">
-            <BookOpen className="w-4 h-4 text-[#8A857D]" />
-            <span>หนังสือ:</span>
+            <LayoutGrid className="w-4 h-4 text-[#8A857D]" />
+            <span>บอร์ด:</span>
           </div>
 
-          {/* "All Books" Tab */}
+          {/* "All Boards" Tab */}
           <button
             type="button"
             onClick={() => onSelectBook('All')}
@@ -52,11 +52,11 @@ export const BookFilter: React.FC<BookFilterProps> = ({
                 : 'bg-[#EFECE6] dark:bg-[#262322] text-[#59544D] dark:text-[#C4C0B8] hover:bg-[#E5DFD5] dark:hover:bg-[#322F2D]'
             }`}
           >
-            <span>ทั้งหมด</span>
+            <span>บอร์ดทั้งหมด</span>
             <span className="opacity-70 text-xs font-normal">({totalNotes})</span>
           </button>
 
-          {/* Book Tabs */}
+          {/* Board Tabs */}
           {books.map((book) => {
             const isSelected = selectedBook === book;
             const count = bookCounts[book] || 0;
@@ -77,7 +77,7 @@ export const BookFilter: React.FC<BookFilterProps> = ({
             );
           })}
 
-          {/* Add Book Button or Inline Input */}
+          {/* Add Board Button or Inline Input */}
           {isAdding ? (
             <form onSubmit={handleAddSubmit} className="flex items-center gap-1.5 shrink-0">
               <input
@@ -85,7 +85,7 @@ export const BookFilter: React.FC<BookFilterProps> = ({
                 autoFocus
                 value={newBookName}
                 onChange={(e) => setNewBookName(e.target.value)}
-                placeholder="ชื่อหนังสือใหม่..."
+                placeholder="ชื่อบอร์ดใหม่..."
                 className="px-3 py-1 text-xs sm:text-sm rounded-xl border border-[#D4CEBF] dark:border-[#443F3B] bg-white dark:bg-[#262322] text-[#2D2824] dark:text-[#ECE9E4] focus:outline-none w-32 sm:w-40"
               />
               <button
@@ -109,7 +109,7 @@ export const BookFilter: React.FC<BookFilterProps> = ({
               className="px-3 py-1.5 rounded-xl text-xs font-medium text-[#7A756E] dark:text-[#99948D] hover:bg-[#EFECE6] dark:hover:bg-[#262322] border border-dashed border-[#D4CEBF] dark:border-[#443F3B] flex items-center gap-1 shrink-0 transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>เพิ่มเล่ม</span>
+              <span>เพิ่มบอร์ด</span>
             </button>
           )}
         </div>
