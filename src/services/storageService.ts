@@ -4,6 +4,8 @@ import { initialNotes } from '@/data/sampleNotes';
 const STORAGE_KEY = 'webapp_post_it_notes_v1';
 const SHEETS_CONFIG_KEY = 'webapp_post_it_sheets_config_v1';
 
+export const DEFAULT_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbyEUz_zRyVTxXarSP3OBnIg4YLOvUblb4-iMcu7VIf7-Nj608sWtkIHEYU9jCNUW_Sy/exec';
+
 export const storageService = {
   // ==========================================
   // LocalStorage Operations (Offline-First)
@@ -15,7 +17,14 @@ export const storageService = {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(initialNotes));
         return initialNotes;
       }
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) {
+        return parsed.map((n) => ({
+          ...n,
+          book: n.book && n.book.trim() ? n.book : 'ทั่วไป',
+        }));
+      }
+      return initialNotes;
     } catch (err) {
       console.error('Error loading notes from localStorage:', err);
       return initialNotes;
@@ -34,15 +43,20 @@ export const storageService = {
     try {
       const data = localStorage.getItem(SHEETS_CONFIG_KEY);
       if (data) {
-        return JSON.parse(data);
+        const parsed = JSON.parse(data);
+        if (parsed.webAppUrl && typeof parsed.webAppUrl === 'string' && parsed.webAppUrl.trim() !== '') {
+          return parsed;
+        }
       }
     } catch (err) {
       console.error('Error loading sheets config:', err);
     }
-    return {
-      webAppUrl: 'https://script.google.com/macros/s/AKfycbyEUz_zRyVTxXarSP3OBnIg4YLOvUblb4-iMcu7VIf7-Nj608sWtkIHEYU9jCNUW_Sy/exec',
+    const defaultCfg: GoogleSheetsConfig = {
+      webAppUrl: DEFAULT_SHEETS_URL,
       autoSync: true,
     };
+    this.saveSheetsConfig(defaultCfg);
+    return defaultCfg;
   },
 
   saveSheetsConfig(config: GoogleSheetsConfig) {
@@ -88,7 +102,10 @@ export const storageService = {
 
     const data = await response.json();
     if (data.status === 'success' && Array.isArray(data.notes)) {
-      return data.notes;
+      return data.notes.map((n: PostItNote) => ({
+        ...n,
+        book: n.book && n.book.trim() ? n.book : 'ทั่วไป',
+      }));
     } else {
       throw new Error(data.message || 'ไม่สามารถดึงข้อมูลจาก Google Sheets ได้');
     }

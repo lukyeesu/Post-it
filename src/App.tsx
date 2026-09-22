@@ -4,15 +4,17 @@ import { BookFilter } from '@/components/BookFilter';
 import { CategoryFilter } from '@/components/CategoryFilter';
 import { PostItCard } from '@/components/PostItCard';
 import { PostItModal } from '@/components/PostItModal';
+import { ManageTaxonomyModal } from '@/components/ManageTaxonomyModal';
+import { CloudSyncModal } from '@/components/CloudSyncModal';
 import { PostItNote, GoogleSheetsConfig } from '@/types/post-it';
-import { storageService } from '@/services/storageService';
+import { storageService, DEFAULT_SHEETS_URL } from '@/services/storageService';
 import { Plus, StickyNote, CheckCircle2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export function App() {
   // 1. Core State
   const [notes, setNotes] = useState<PostItNote[]>(() => storageService.getNotes());
-  const [sheetsConfig] = useState<GoogleSheetsConfig>(() => storageService.getSheetsConfig());
+  const [sheetsConfig, setSheetsConfig] = useState<GoogleSheetsConfig>(() => storageService.getSheetsConfig());
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'connected' | 'error'>('idle');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBook, setSelectedBook] = useState<string>('All');
@@ -26,6 +28,8 @@ export function App() {
 
   // 2. Modals State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+  const [isCloudModalOpen, setIsCloudModalOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<PostItNote | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -52,94 +56,91 @@ export function App() {
     }, 2500);
   };
 
-  // 3. Auto-sync on Load: Fetch notes from Google Sheets if available
+  // 3. Fast Auto-Sync on Mount: Directly fetch from Google Sheets
   useEffect(() => {
-    if (!sheetsConfig.webAppUrl) return;
-
+    const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
     let isMounted = true;
-    const initSync = async () => {
+
+    const fetchLatestFromSheets = async () => {
       try {
         setSyncStatus('syncing');
-        // Ping Google Sheets API
-        const isAlive = await storageService.pingGoogleSheets(sheetsConfig.webAppUrl);
-        if (!isAlive) {
-          if (isMounted) setSyncStatus('error');
-          return;
-        }
+        const remoteNotes = await storageService.fetchFromGoogleSheets(targetUrl);
+        if (!isMounted) return;
 
-        // Fetch remote notes
-        try {
-          const remoteNotes = await storageService.fetchFromGoogleSheets(sheetsConfig.webAppUrl);
-          if (!isMounted) return;
-
-          if (remoteNotes && remoteNotes.length > 0) {
-            setNotes(remoteNotes);
-            storageService.saveNotes(remoteNotes);
-            setSyncStatus('connected');
-          } else {
-            // If remote sheet is empty, sync local notes up
-            if (notes.length > 0) {
-              await storageService.syncToGoogleSheets(sheetsConfig.webAppUrl, notes);
-            }
-            setSyncStatus('connected');
-          }
-        } catch (fetchErr) {
-          console.warn('Initial remote fetch had an issue, fallback to local notes:', fetchErr);
-          if (isMounted) setSyncStatus('connected');
-        }
-      } catch (err) {
-        console.error('Init sync error:', err);
-        if (isMounted) setSyncStatus('error');
-      }
-    };
-
-    initSync();
-    return () => { isMounted = false; };
-  }, [sheetsConfig.webAppUrl]);
-
-  // Manual Sync trigger
-  const handleManualSync = async () => {
-    if (!sheetsConfig.webAppUrl) {
-      showToast('ไม่พบ Google Sheets API URL');
-      return;
-    }
-    try {
-      setSyncStatus('syncing');
-      showToast('กำลังเชื่อมต่อ Google Sheets...');
-      
-      const isAlive = await storageService.pingGoogleSheets(sheetsConfig.webAppUrl);
-      if (!isAlive) {
-        setSyncStatus('error');
-        showToast('ไม่สามารถเชื่อมต่อ Google Sheets ได้');
-        return;
-      }
-
-      // Try fetching latest
-      try {
-        const remoteNotes = await storageService.fetchFromGoogleSheets(sheetsConfig.webAppUrl);
-        if (remoteNotes && remoteNotes.length > 0) {
+        if (Array.isArray(remoteNotes) && remoteNotes.length > 0) {
           setNotes(remoteNotes);
           storageService.saveNotes(remoteNotes);
           setSyncStatus('connected');
-          showToast(`ซิงค์ข้อมูลเรียบร้อย (${remoteNotes.length} รายการ) ☁️`);
-          return;
+          showToast(`เชื่อมต่อ Google Sheets แล้ว (พบข้อมูล ${remoteNotes.length} รายการ) ☁️`);
+        } else {
+          // If remote sheet is empty but local has notes, upload local notes to initialize sheet
+          if (notes.length > 0) {
+            await storageService.syncToGoogleSheets(targetUrl, notes);
+          }
+          setSyncStatus('connected');
         }
-      } catch {
-        // Fallback to uploading
+      } catch (err) {
+        console.warn('Initial fetch from Google Sheets:', err);
+        if (isMounted) {
+          // Check ping as fallback indicator
+          storageService.pingGoogleSheets(targetUrl).then((alive) => {
+            if (isMounted) setSyncStatus(alive ? 'connected' : 'error');
+          });
+        }
       }
+    };
 
-      // Upload local notes to sheet
-      await storageService.syncToGoogleSheets(sheetsConfig.webAppUrl, notes);
-      setSyncStatus('connected');
-      showToast('ซิงค์ข้อมูลขึ้น Google Sheets สำเร็จ ☁️');
+    fetchLatestFromSheets();
+    return () => { isMounted = false; };
+  }, [sheetsConfig.webAppUrl]);
+
+  // 4. Cloud Sync Actions (Fetch & Upload)
+  const handleFetchFromSheets = async () => {
+    const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
+    try {
+      setSyncStatus('syncing');
+      showToast('กำลังดึงข้อมูลจาก Google Sheets...');
+      const remoteNotes = await storageService.fetchFromGoogleSheets(targetUrl);
+      if (Array.isArray(remoteNotes) && remoteNotes.length > 0) {
+        setNotes(remoteNotes);
+        storageService.saveNotes(remoteNotes);
+        setSyncStatus('connected');
+        showToast(`ดึงข้อมูลสำเร็จ ${remoteNotes.length} รายการ ☁️`);
+      } else {
+        setSyncStatus('connected');
+        showToast('ไม่พบข้อมูลใน Google Sheets');
+      }
     } catch (err) {
-      console.error('Manual sync failed:', err);
+      console.error('Fetch failed:', err);
       setSyncStatus('error');
-      showToast('ซิงค์ไม่สำเร็จ โปรดตรวจสอบการเชื่อมต่อ');
+      showToast('ดึงข้อมูลไม่สำเร็จ โปรดตรวจสอบการเชื่อมต่อ');
     }
   };
 
-  // 4. Boards calculation (e.g. กีฬา, งาน, ทั่วไป)
+  const handleUploadToSheets = async () => {
+    const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
+    try {
+      setSyncStatus('syncing');
+      showToast('กำลังส่งข้อมูลขึ้น Google Sheets...');
+      await storageService.syncToGoogleSheets(targetUrl, notes);
+      setSyncStatus('connected');
+      showToast(`อัปโหลดข้อมูลสำเร็จ ${notes.length} รายการ ☁️`);
+    } catch (err) {
+      console.error('Upload failed:', err);
+      setSyncStatus('error');
+      showToast('อัปโหลดไม่สำเร็จ โปรดลองใหม่');
+    }
+  };
+
+  const handleSaveNewUrl = (newUrl: string) => {
+    const updated = { ...sheetsConfig, webAppUrl: newUrl };
+    setSheetsConfig(updated);
+    storageService.saveSheetsConfig(updated);
+    showToast('บันทึก API URL เรียบร้อย');
+    handleFetchFromSheets();
+  };
+
+  // 5. Boards calculation (e.g. กีฬา, งาน, ทั่วไป)
   const allBooks = useMemo(() => {
     const defaults = ['กีฬา', 'งาน', 'ทั่วไป'];
     const custom = notes
@@ -157,9 +158,14 @@ export function App() {
     return counts;
   }, [notes]);
 
-  // 5. Categories list calculation (Filtered by selected board if one is active)
+  // 6. Categories list calculation
+  const allCategoriesGlobal = useMemo(() => {
+    const defaultCats = ['Work', 'Ideas', 'Todo', 'Personal', 'Focus', 'ฟุตบอล', 'วิ่ง', 'ไก่ชน'];
+    const custom = notes.map((n) => n.category).filter(Boolean);
+    return Array.from(new Set([...defaultCats, ...custom]));
+  }, [notes]);
+
   const availableCategories = useMemo(() => {
-    const defaultCats = ['Work', 'Ideas', 'Todo', 'Personal', 'Focus', 'ฟุตบอล', 'วิ่ง'];
     const sourceNotes = selectedBook === 'All' 
       ? notes 
       : notes.filter((n) => (n.book || 'ทั่วไป') === selectedBook);
@@ -168,7 +174,7 @@ export function App() {
     const combined = Array.from(new Set([...catsFromNotes]));
     
     if (combined.length === 0) {
-      return defaultCats.slice(0, 4);
+      return ['Work', 'Ideas', 'Todo', 'Personal'];
     }
     return combined;
   }, [notes, selectedBook]);
@@ -185,7 +191,106 @@ export function App() {
     showToast(`เปิดบอร์ด "${newBookName}" แล้ว`);
   };
 
-  // Category counts within the current board view
+  // 7. Board Management Handlers (Rename & Delete)
+  const handleRenameBoard = (oldName: string, newName: string) => {
+    const updatedNotes = notes.map((n) => {
+      const currentBook = n.book || 'ทั่วไป';
+      if (currentBook === oldName) {
+        return { ...n, book: newName, updatedAt: new Date().toISOString() };
+      }
+      return n;
+    });
+    setNotes(updatedNotes);
+    if (selectedBook === oldName) {
+      setSelectedBook(newName);
+    }
+    showToast(`เปลี่ยนชื่อบอร์ดเป็น "${newName}" แล้ว`);
+
+    // Sync with Google Sheets
+    const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
+    setSyncStatus('syncing');
+    storageService.syncToGoogleSheets(targetUrl, updatedNotes)
+      .then(() => setSyncStatus('connected'))
+      .catch(() => setSyncStatus('connected'));
+  };
+
+  const handleDeleteBoard = (boardName: string) => {
+    if (boardName === 'ทั่วไป') {
+      showToast('ไม่สามารถลบบอร์ดทั่วไปได้');
+      return;
+    }
+    // Reassign all notes in this board to 'ทั่วไป'
+    const updatedNotes = notes.map((n) => {
+      const currentBook = n.book || 'ทั่วไป';
+      if (currentBook === boardName) {
+        return { ...n, book: 'ทั่วไป', updatedAt: new Date().toISOString() };
+      }
+      return n;
+    });
+    setNotes(updatedNotes);
+    if (selectedBook === boardName) {
+      setSelectedBook('All');
+    }
+    showToast(`ลบบอร์ด "${boardName}" แล้ว (ย้ายโน้ตไปบอร์ดทั่วไป)`);
+
+    // Sync with Google Sheets
+    const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
+    setSyncStatus('syncing');
+    storageService.syncToGoogleSheets(targetUrl, updatedNotes)
+      .then(() => setSyncStatus('connected'))
+      .catch(() => setSyncStatus('connected'));
+  };
+
+  // 8. Category Management Handlers (Rename & Delete)
+  const handleRenameCategory = (oldName: string, newName: string) => {
+    const updatedNotes = notes.map((n) => {
+      if (n.category === oldName) {
+        return { ...n, category: newName, updatedAt: new Date().toISOString() };
+      }
+      return n;
+    });
+    setNotes(updatedNotes);
+    if (selectedCategory === oldName) {
+      setSelectedCategory(newName);
+    }
+    showToast(`เปลี่ยนชื่อหมวดหมู่เป็น "${newName}" แล้ว`);
+
+    // Sync with Google Sheets
+    const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
+    setSyncStatus('syncing');
+    storageService.syncToGoogleSheets(targetUrl, updatedNotes)
+      .then(() => setSyncStatus('connected'))
+      .catch(() => setSyncStatus('connected'));
+  };
+
+  const handleDeleteCategory = (catName: string) => {
+    // Reassign all notes in this category to 'Ideas'
+    const updatedNotes = notes.map((n) => {
+      if (n.category === catName) {
+        return { ...n, category: 'Ideas', updatedAt: new Date().toISOString() };
+      }
+      return n;
+    });
+    setNotes(updatedNotes);
+    if (selectedCategory === catName) {
+      setSelectedCategory('All');
+    }
+    showToast(`ลบหมวดหมู่ "${catName}" แล้ว (ย้ายโน้ตไป Ideas)`);
+
+    // Sync with Google Sheets
+    const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
+    setSyncStatus('syncing');
+    storageService.syncToGoogleSheets(targetUrl, updatedNotes)
+      .then(() => setSyncStatus('connected'))
+      .catch(() => setSyncStatus('connected'));
+  };
+
+  const handleAddCategoryGlobal = (newCat: string) => {
+    setSelectedCategory(newCat);
+    showToast(`สร้างหมวดหมู่ "${newCat}" แล้ว`);
+  };
+
+  // Category counts within current board view
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     const sourceNotes = selectedBook === 'All' 
@@ -250,9 +355,11 @@ export function App() {
       });
   }, [notes, searchQuery, selectedBook, selectedCategory, showPinnedOnly, showCompletedOnly]);
 
-  // Actions
+  // Save Note Action
   const handleSaveNote = (noteData: Omit<PostItNote, 'id' | 'createdAt' | 'updatedAt'>, id?: string) => {
     const now = new Date().toISOString();
+    const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
+
     if (id) {
       // Update
       const updated = { ...noteData, id, updatedAt: now } as PostItNote;
@@ -260,9 +367,9 @@ export function App() {
         prev.map((n) => (n.id === id ? { ...n, ...noteData, updatedAt: now } : n))
       );
       showToast('บันทึกการแก้ไขแล้ว');
-      if (sheetsConfig.webAppUrl) {
+      if (targetUrl) {
         setSyncStatus('syncing');
-        storageService.apiUpdateNote(sheetsConfig.webAppUrl, updated)
+        storageService.apiUpdateNote(targetUrl, updated)
           .then(() => setSyncStatus('connected'))
           .catch(() => setSyncStatus('connected'));
       }
@@ -281,9 +388,9 @@ export function App() {
         spread: 45,
         origin: { y: 0.9 },
       });
-      if (sheetsConfig.webAppUrl) {
+      if (targetUrl) {
         setSyncStatus('syncing');
-        storageService.apiCreateNote(sheetsConfig.webAppUrl, newNote)
+        storageService.apiCreateNote(targetUrl, newNote)
           .then(() => setSyncStatus('connected'))
           .catch(() => setSyncStatus('connected'));
       }
@@ -292,11 +399,12 @@ export function App() {
 
   const handleDeleteNote = (id: string) => {
     if (window.confirm('คุณต้องการลบโพสต์อิทนี้ใช่หรือไม่?')) {
+      const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
       setNotes((prev) => prev.filter((n) => n.id !== id));
       showToast('ลบโพสต์อิทแล้ว');
-      if (sheetsConfig.webAppUrl) {
+      if (targetUrl) {
         setSyncStatus('syncing');
-        storageService.apiDeleteNote(sheetsConfig.webAppUrl, id)
+        storageService.apiDeleteNote(targetUrl, id)
           .then(() => setSyncStatus('connected'))
           .catch(() => setSyncStatus('connected'));
       }
@@ -304,6 +412,7 @@ export function App() {
   };
 
   const handleTogglePin = (id: string) => {
+    const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
     setNotes((prev) =>
       prev.map((n) => {
         if (n.id === id) {
@@ -314,19 +423,20 @@ export function App() {
         return n;
       })
     );
-    if (sheetsConfig.webAppUrl) {
-      storageService.apiTogglePin(sheetsConfig.webAppUrl, id)
+    if (targetUrl) {
+      storageService.apiTogglePin(targetUrl, id)
         .then(() => setSyncStatus('connected'))
         .catch(() => setSyncStatus('connected'));
     }
   };
 
   const handleToggleComplete = (id: string) => {
+    const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
     setNotes((prev) =>
       prev.map((n) => (n.id === id ? { ...n, isCompleted: !n.isCompleted } : n))
     );
-    if (sheetsConfig.webAppUrl) {
-      storageService.apiToggleComplete(sheetsConfig.webAppUrl, id)
+    if (targetUrl) {
+      storageService.apiToggleComplete(targetUrl, id)
         .then(() => setSyncStatus('connected'))
         .catch(() => setSyncStatus('connected'));
     }
@@ -372,7 +482,7 @@ export function App() {
         onToggleDarkMode={() => setDarkMode(!darkMode)}
         totalNotes={notes.length}
         syncStatus={syncStatus}
-        onSyncNow={handleManualSync}
+        onSyncNow={() => setIsCloudModalOpen(true)}
       />
 
       {/* Main Board Container (Widescreen fluid layout max-w-[1700px]) */}
@@ -384,6 +494,9 @@ export function App() {
           selectedBook={selectedBook}
           onSelectBook={handleSelectBook}
           onAddBook={handleAddBook}
+          onRenameBoard={handleRenameBoard}
+          onDeleteBoard={handleDeleteBoard}
+          onOpenManageModal={() => setIsManageModalOpen(true)}
           bookCounts={bookCounts}
           totalNotes={notes.length}
         />
@@ -394,6 +507,8 @@ export function App() {
           categories={availableCategories}
           selectedCategory={selectedCategory}
           onSelectCategory={setSelectedCategory}
+          onRenameCategory={handleRenameCategory}
+          onDeleteCategory={handleDeleteCategory}
           showPinnedOnly={showPinnedOnly}
           onTogglePinnedOnly={() => setShowPinnedOnly(!showPinnedOnly)}
           showCompletedOnly={showCompletedOnly}
@@ -461,6 +576,34 @@ export function App() {
         categories={availableCategories}
         books={allBooks}
         defaultBook={selectedBook !== 'All' ? selectedBook : 'ทั่วไป'}
+      />
+
+      {/* Manage Taxonomy Modal (Manage Boards & Categories) */}
+      <ManageTaxonomyModal
+        isOpen={isManageModalOpen}
+        onClose={() => setIsManageModalOpen(false)}
+        books={allBooks}
+        categories={allCategoriesGlobal}
+        bookCounts={bookCounts}
+        categoryCounts={categoryCounts}
+        onRenameBoard={handleRenameBoard}
+        onDeleteBoard={handleDeleteBoard}
+        onAddBoard={handleAddBook}
+        onRenameCategory={handleRenameCategory}
+        onDeleteCategory={handleDeleteCategory}
+        onAddCategory={handleAddCategoryGlobal}
+      />
+
+      {/* Cloud Sync Modal (Google Sheets Connection Details & Sync) */}
+      <CloudSyncModal
+        isOpen={isCloudModalOpen}
+        onClose={() => setIsCloudModalOpen(false)}
+        webAppUrl={sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL}
+        onSaveUrl={handleSaveNewUrl}
+        syncStatus={syncStatus}
+        totalLocalNotes={notes.length}
+        onFetchFromSheets={handleFetchFromSheets}
+        onUploadToSheets={handleUploadToSheets}
       />
 
     </div>

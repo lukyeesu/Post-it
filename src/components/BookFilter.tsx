@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import { LayoutGrid, Plus, X } from 'lucide-react';
+import { LayoutGrid, Plus, X, Edit2, Trash2, Settings2 } from 'lucide-react';
 
 interface BookFilterProps {
   books: string[];
   selectedBook: string;
   onSelectBook: (book: string) => void;
   onAddBook: (newBook: string) => void;
+  onRenameBoard: (oldName: string, newName: string) => void;
+  onDeleteBoard: (boardName: string) => void;
+  onOpenManageModal: () => void;
   bookCounts: Record<string, number>;
   totalNotes: number;
 }
@@ -15,6 +18,9 @@ export const BookFilter: React.FC<BookFilterProps> = ({
   selectedBook,
   onSelectBook,
   onAddBook,
+  onRenameBoard,
+  onDeleteBoard,
+  onOpenManageModal,
   bookCounts,
   totalNotes,
 }) => {
@@ -31,11 +37,26 @@ export const BookFilter: React.FC<BookFilterProps> = ({
     }
   };
 
+  const handleInlineRename = () => {
+    if (selectedBook === 'All') return;
+    const newName = window.prompt(`แก้ไขชื่อบอร์ด "${selectedBook}" เป็น:`, selectedBook);
+    if (newName && newName.trim() && newName.trim() !== selectedBook) {
+      onRenameBoard(selectedBook, newName.trim());
+    }
+  };
+
+  const handleInlineDelete = () => {
+    if (selectedBook === 'All' || selectedBook === 'ทั่วไป') return;
+    if (window.confirm(`คุณต้องการลบบอร์ด "${selectedBook}" ใช่หรือไม่?\n(โน้ตในบอร์ดนี้จะถูกย้ายไปรวมที่บอร์ด "ทั่วไป")`)) {
+      onDeleteBoard(selectedBook);
+    }
+  };
+
   return (
     <div className="w-full mb-5">
       {/* Board Tabs Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none max-w-full">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none max-w-full flex-1">
           {/* Label */}
           <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#7A756E] dark:text-[#99948D] mr-1 shrink-0">
             <LayoutGrid className="w-4 h-4 text-[#8A857D]" />
@@ -77,6 +98,33 @@ export const BookFilter: React.FC<BookFilterProps> = ({
             );
           })}
 
+          {/* Quick Edit/Delete for Active Board */}
+          {selectedBook !== 'All' && (
+            <div className="flex items-center gap-1 shrink-0 border-l border-[#E8E4DC] dark:border-[#363330] pl-2 ml-1">
+              <button
+                type="button"
+                onClick={handleInlineRename}
+                className="px-2 py-1 rounded-lg text-[#7A756E] hover:text-[#2D2824] hover:bg-[#EFECE6] dark:hover:bg-[#2A2725] text-xs flex items-center gap-1 transition-colors"
+                title={`แก้ไขชื่อบอร์ด ${selectedBook}`}
+              >
+                <Edit2 className="w-3 h-3" />
+                <span className="text-xs hidden sm:inline">แก้ชื่อ</span>
+              </button>
+
+              {selectedBook !== 'ทั่วไป' && (
+                <button
+                  type="button"
+                  onClick={handleInlineDelete}
+                  className="px-2 py-1 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs flex items-center gap-1 transition-colors"
+                  title={`ลบบอร์ด ${selectedBook}`}
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span className="text-xs hidden sm:inline">ลบ</span>
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Add Board Button or Inline Input */}
           {isAdding ? (
             <form onSubmit={handleAddSubmit} className="flex items-center gap-1.5 shrink-0">
@@ -113,6 +161,17 @@ export const BookFilter: React.FC<BookFilterProps> = ({
             </button>
           )}
         </div>
+
+        {/* Manage Modal Button */}
+        <button
+          type="button"
+          onClick={onOpenManageModal}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#7A756E] dark:text-[#99948D] hover:text-[#2D2824] dark:hover:text-[#ECE9E4] hover:bg-[#EFECE6] dark:hover:bg-[#2A2725] rounded-xl border border-transparent hover:border-[#E0DBD0] transition-colors shrink-0"
+          title="จัดการและแก้ไขบอร์ดหรือหมวดหมู่ทั้งหมด"
+        >
+          <Settings2 className="w-3.5 h-3.5" />
+          <span>จัดการบอร์ด & หมวดหมู่</span>
+        </button>
       </div>
     </div>
   );
