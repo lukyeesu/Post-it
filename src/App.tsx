@@ -127,10 +127,14 @@ export function App() {
     const now = new Date().toISOString();
     if (id) {
       // Update
+      const updated = { ...noteData, id, updatedAt: now } as PostItNote;
       setNotes((prev) =>
         prev.map((n) => (n.id === id ? { ...n, ...noteData, updatedAt: now } : n))
       );
       showToast('แก้ไขโพสต์อิทเรียบร้อยแล้ว ✨');
+      if (sheetsConfig.webAppUrl) {
+        storageService.apiUpdateNote(sheetsConfig.webAppUrl, updated).catch(console.error);
+      }
     } else {
       // Create
       const newNote: PostItNote = {
@@ -146,6 +150,9 @@ export function App() {
         spread: 50,
         origin: { y: 0.9 },
       });
+      if (sheetsConfig.webAppUrl) {
+        storageService.apiCreateNote(sheetsConfig.webAppUrl, newNote).catch(console.error);
+      }
     }
   };
 
@@ -153,6 +160,9 @@ export function App() {
     if (window.confirm('คุณต้องการลบโพสต์อิทนี้ใช่หรือไม่?')) {
       setNotes((prev) => prev.filter((n) => n.id !== id));
       showToast('ลบโพสต์อิทเรียบร้อยแล้ว');
+      if (sheetsConfig.webAppUrl) {
+        storageService.apiDeleteNote(sheetsConfig.webAppUrl, id).catch(console.error);
+      }
     }
   };
 
@@ -167,12 +177,18 @@ export function App() {
         return n;
       })
     );
+    if (sheetsConfig.webAppUrl) {
+      storageService.apiTogglePin(sheetsConfig.webAppUrl, id).catch(console.error);
+    }
   };
 
   const handleToggleComplete = (id: string) => {
     setNotes((prev) =>
       prev.map((n) => (n.id === id ? { ...n, isCompleted: !n.isCompleted } : n))
     );
+    if (sheetsConfig.webAppUrl) {
+      storageService.apiToggleComplete(sheetsConfig.webAppUrl, id).catch(console.error);
+    }
   };
 
   const handleEditNote = (note: PostItNote) => {

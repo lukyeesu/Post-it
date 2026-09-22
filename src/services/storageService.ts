@@ -40,8 +40,8 @@ export const storageService = {
       console.error('Error loading sheets config:', err);
     }
     return {
-      webAppUrl: '',
-      autoSync: false,
+      webAppUrl: 'https://script.google.com/macros/s/AKfycbyEUz_zRyVTxXarSP3OBnIg4YLOvUblb4-iMcu7VIf7-Nj608sWtkIHEYU9jCNUW_Sy/exec',
+      autoSync: true,
     };
   },
 
