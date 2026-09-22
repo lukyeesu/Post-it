@@ -27,7 +27,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   return (
     <header className="sticky top-0 z-40 w-full backdrop-blur-md bg-[#FAF8F5]/90 dark:bg-[#1D1B1A]/90 border-b border-[#E8E4DC] dark:border-[#33312E] transition-colors">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-4 sm:gap-6">
+      <div className="max-w-[1700px] mx-auto px-4 sm:px-8 lg:px-12 h-20 flex items-center justify-between gap-4 sm:gap-6">
         
         {/* Brand & Logo (Enhanced proportions) */}
         <div className="flex items-center gap-3.5 cursor-pointer select-none">

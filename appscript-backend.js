@@ -46,7 +46,8 @@ const HEADERS = [
   'isCompleted', // H: สถานะทำเสร็จ (TRUE / FALSE)
   'glowColor',   // I: สีแสง Glow ของ Spotlight card
   'createdAt',   // J: วันเวลาที่สร้าง (ISO Date string)
-  'updatedAt'    // K: วันเวลาที่แก้ไขล่าสุด (ISO Date string)
+  'updatedAt',   // K: วันเวลาที่แก้ไขล่าสุด (ISO Date string)
+  'book'         // L: เล่มหนังสือ (เช่น กีฬา, งาน, ทั่วไป)
 ];
 
 /**
@@ -83,6 +84,7 @@ function getOrCreateSheet() {
     sheet.setColumnWidth(9, 100); // glowColor
     sheet.setColumnWidth(10, 190); // createdAt
     sheet.setColumnWidth(11, 190); // updatedAt
+    sheet.setColumnWidth(12, 140); // book
   }
   
   return sheet;
@@ -206,7 +208,8 @@ function doPost(e) {
         Boolean(note.isCompleted),
         note.glowColor || 'purple',
         note.createdAt || now,
-        note.updatedAt || now
+        note.updatedAt || now,
+        note.book || 'ทั่วไป'
       ];
 
       sheet.appendRow(rowData);
@@ -240,7 +243,8 @@ function doPost(e) {
         note.isCompleted !== undefined ? Boolean(note.isCompleted) : old[7],
         note.glowColor !== undefined ? note.glowColor : old[8],
         old[9] || now, // วันเวลาสร้างเดิม
-        now            // อัปเดต updatedAt ใหม่
+        now,           // อัปเดต updatedAt ใหม่
+        note.book !== undefined ? note.book : (old[11] || 'ทั่วไป')
       ];
 
       sheet.getRange(rowIndex, 1, 1, HEADERS.length).setValues([updatedRow]);
@@ -315,7 +319,8 @@ function doPost(e) {
           Boolean(n.isCompleted),
           n.glowColor || 'purple',
           n.createdAt || now,
-          n.updatedAt || now
+          n.updatedAt || now,
+          n.book || 'ทั่วไป'
         ]);
         sheet.getRange(2, 1, rows.length, HEADERS.length).setValues(rows);
       }
@@ -364,7 +369,8 @@ function parseRowsToNotes(rows) {
       isCompleted: Boolean(r[7]),
       glowColor: String(r[8] || 'purple'),
       createdAt: r[9] ? String(r[9]) : new Date().toISOString(),
-      updatedAt: r[10] ? String(r[10]) : new Date().toISOString()
+      updatedAt: r[10] ? String(r[10]) : new Date().toISOString(),
+      book: r[11] ? String(r[11]) : 'ทั่วไป'
     };
   });
 }

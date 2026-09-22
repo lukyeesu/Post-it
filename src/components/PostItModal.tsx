@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Pin, Tag } from 'lucide-react';
+import { X, Pin, Tag, BookOpen } from 'lucide-react';
 import { PostItNote, NoteColor } from '@/types/post-it';
 
 interface PostItModalProps {
@@ -8,6 +8,8 @@ interface PostItModalProps {
   onSave: (note: Omit<PostItNote, 'id' | 'createdAt' | 'updatedAt'>, id?: string) => void;
   editingNote?: PostItNote | null;
   categories: string[];
+  books: string[];
+  defaultBook?: string;
 }
 
 const mujiColorOptions: { id: NoteColor; name: string; bgClass: string; dotClass: string }[] = [
@@ -26,9 +28,13 @@ export const PostItModal: React.FC<PostItModalProps> = ({
   onSave,
   editingNote,
   categories,
+  books,
+  defaultBook = 'ทั่วไป',
 }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [book, setBook] = useState(defaultBook);
+  const [customBook, setCustomBook] = useState('');
   const [category, setCategory] = useState('Ideas');
   const [customCategory, setCustomCategory] = useState('');
   const [color, setColor] = useState<NoteColor>('sand');
@@ -39,6 +45,8 @@ export const PostItModal: React.FC<PostItModalProps> = ({
     if (editingNote) {
       setTitle(editingNote.title);
       setContent(editingNote.content);
+      setBook(editingNote.book || 'ทั่วไป');
+      setCustomBook('');
       setCategory(editingNote.category);
       setCustomCategory('');
       setColor(editingNote.color || 'sand');
@@ -47,13 +55,15 @@ export const PostItModal: React.FC<PostItModalProps> = ({
     } else {
       setTitle('');
       setContent('');
+      setBook(defaultBook !== 'All' ? defaultBook : (books[0] || 'ทั่วไป'));
+      setCustomBook('');
       setCategory('Ideas');
       setCustomCategory('');
       setColor('sand');
       setTagInput('');
       setIsPinned(false);
     }
-  }, [editingNote, isOpen]);
+  }, [editingNote, isOpen, defaultBook, books]);
 
   if (!isOpen) return null;
 
@@ -61,6 +71,7 @@ export const PostItModal: React.FC<PostItModalProps> = ({
     e.preventDefault();
     if (!title.trim() && !content.trim()) return;
 
+    const finalBook = customBook.trim() ? customBook.trim() : (book === 'custom' ? 'ทั่วไป' : book);
     const finalCategory = customCategory.trim() ? customCategory.trim() : category;
     const tags = tagInput
       .split(',')
@@ -69,6 +80,7 @@ export const PostItModal: React.FC<PostItModalProps> = ({
 
     onSave(
       {
+        book: finalBook || 'ทั่วไป',
         title: title.trim() || 'ไม่มีหัวข้อ',
         content: content.trim(),
         category: finalCategory,
@@ -93,6 +105,7 @@ export const PostItModal: React.FC<PostItModalProps> = ({
             {editingNote ? 'แก้ไขโพสต์อิท' : 'สร้างโพสต์อิทใหม่'}
           </h2>
           <button
+            type="button"
             onClick={onClose}
             className="w-9 h-9 rounded-xl flex items-center justify-center text-[#8A857D] hover:text-[#2D2824] dark:hover:text-[#ECE9E4] hover:bg-[#EFECE6] dark:hover:bg-[#2A2725] transition-colors"
           >
@@ -102,6 +115,39 @@ export const PostItModal: React.FC<PostItModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-5 max-h-[80vh] overflow-y-auto">
+          
+          {/* Book (หนังสือ) Selection */}
+          <div className="bg-[#F5F2EB]/60 dark:bg-[#262322]/60 p-4 rounded-2xl border border-[#E8E4DC] dark:border-[#363330]">
+            <label className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#7A756E] dark:text-[#99948D] mb-2">
+              <BookOpen className="w-4 h-4 text-[#8A857D]" />
+              <span>เล่มหนังสือ (Book / Project)</span>
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <select
+                value={book}
+                onChange={(e) => setBook(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl border border-[#E0DBD0] dark:border-[#363330] bg-white dark:bg-[#262322] text-[#2D2824] dark:text-[#ECE9E4] text-sm sm:text-base focus:outline-none focus:border-[#713F12]/50 shadow-2xs"
+              >
+                {books.map((b) => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+                <option value="custom">+ เพิ่มชื่อเล่มใหม่...</option>
+              </select>
+
+              {book === 'custom' && (
+                <input
+                  type="text"
+                  autoFocus
+                  required
+                  value={customBook}
+                  onChange={(e) => setCustomBook(e.target.value)}
+                  placeholder="เช่น กีฬา, การเงิน, บันทึกความจำ..."
+                  className="w-full px-4 py-2.5 rounded-xl border border-[#E0DBD0] dark:border-[#363330] bg-white dark:bg-[#262322] text-[#2D2824] dark:text-[#ECE9E4] text-sm sm:text-base focus:outline-none focus:border-[#713F12]/50 shadow-2xs"
+                />
+              )}
+            </div>
+          </div>
+
           {/* Title */}
           <div>
             <label className="block text-xs sm:text-sm font-semibold text-[#7A756E] dark:text-[#99948D] mb-2">
@@ -112,7 +158,7 @@ export const PostItModal: React.FC<PostItModalProps> = ({
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="เช่น ซื้อของเข้าออฟฟิศ, แผนงานประจำสัปดาห์..."
+              placeholder="เช่น ซื้อของเข้าออฟฟิศ, ตารางซ้อมฟุตบอล..."
               className="w-full px-4 py-3 text-base rounded-2xl border border-[#E0DBD0] dark:border-[#363330] bg-white dark:bg-[#262322] text-[#2D2824] dark:text-[#ECE9E4] placeholder-[#A39E95] dark:placeholder-[#6B665F] focus:outline-none focus:border-[#713F12]/50 dark:focus:border-[#A39E95]/50 transition-all shadow-2xs"
             />
           </div>
@@ -120,10 +166,10 @@ export const PostItModal: React.FC<PostItModalProps> = ({
           {/* Content */}
           <div>
             <label className="block text-xs sm:text-sm font-semibold text-[#7A756E] dark:text-[#99948D] mb-2">
-              เนื้อหาโพสต์อิท
+              เนื้อหาโพสต์อิท (กดคลิกที่การ์ดจะคัดลอกส่วนนี้)
             </label>
             <textarea
-              rows={5}
+              rows={4}
               required
               value={content}
               onChange={(e) => setContent(e.target.value)}
@@ -159,7 +205,7 @@ export const PostItModal: React.FC<PostItModalProps> = ({
                   type="text"
                   value={customCategory}
                   onChange={(e) => setCustomCategory(e.target.value)}
-                  placeholder="เช่น Marketing, Home..."
+                  placeholder="เช่น Marketing, Home, ซ้อม..."
                   className="w-full px-4 py-2.5 rounded-2xl border border-[#E0DBD0] dark:border-[#363330] bg-white dark:bg-[#262322] text-[#2D2824] dark:text-[#ECE9E4] text-sm sm:text-base focus:outline-none focus:border-[#713F12]/50 shadow-2xs"
                 />
               </div>
@@ -220,7 +266,7 @@ export const PostItModal: React.FC<PostItModalProps> = ({
             </label>
           </div>
 
-          {/* Modal Footer (Larger buttons) */}
+          {/* Modal Footer */}
           <div className="pt-5 border-t border-[#E8E4DC] dark:border-[#363230] flex items-center justify-end gap-3">
             <button
               type="button"

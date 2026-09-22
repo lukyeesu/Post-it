@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Navbar } from '@/components/Navbar';
+import { BookFilter } from '@/components/BookFilter';
 import { CategoryFilter } from '@/components/CategoryFilter';
 import { PostItCard } from '@/components/PostItCard';
 import { PostItModal } from '@/components/PostItModal';
@@ -13,6 +14,7 @@ export function App() {
   const [notes, setNotes] = useState<PostItNote[]>(() => storageService.getNotes());
   const [sheetsConfig] = useState<GoogleSheetsConfig>(() => storageService.getSheetsConfig());
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedBook, setSelectedBook] = useState<string>('All');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showPinnedOnly, setShowPinnedOnly] = useState(false);
   const [showCompletedOnly, setShowCompletedOnly] = useState(false);
@@ -49,43 +51,92 @@ export function App() {
     }, 2200);
   };
 
-  // Categories list calculation
-  const allCategories = useMemo(() => {
-    const defaultCats = ['Work', 'Ideas', 'Todo', 'Personal', 'Focus'];
-    const customCats = notes
-      .map((n) => n.category)
-      .filter((c) => c && !defaultCats.includes(c));
-    return Array.from(new Set([...defaultCats, ...customCats]));
+  // 3. Books calculation (e.g. กีฬา, งาน, ทั่วไป)
+  const allBooks = useMemo(() => {
+    const defaults = ['กีฬา', 'งาน', 'ทั่วไป'];
+    const custom = notes
+      .map((n) => n.book || 'ทั่วไป')
+      .filter((b) => b && !defaults.includes(b));
+    return Array.from(new Set([...defaults, ...custom]));
   }, [notes]);
 
-  // Category counts
-  const categoryCounts = useMemo(() => {
+  const bookCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const note of notes) {
-      counts[note.category] = (counts[note.category] || 0) + 1;
+      const b = note.book || 'ทั่วไป';
+      counts[b] = (counts[b] || 0) + 1;
     }
     return counts;
   }, [notes]);
+
+  // 4. Categories list calculation (Filtered by selected book if one is active)
+  const availableCategories = useMemo(() => {
+    const defaultCats = ['Work', 'Ideas', 'Todo', 'Personal', 'Focus', 'ฟุตบอล', 'วิ่ง'];
+    const sourceNotes = selectedBook === 'All' 
+      ? notes 
+      : notes.filter((n) => (n.book || 'ทั่วไป') === selectedBook);
+    
+    const catsFromNotes = sourceNotes.map((n) => n.category).filter(Boolean);
+    const combined = Array.from(new Set([...catsFromNotes]));
+    
+    // If no notes yet in this book, provide useful defaults
+    if (combined.length === 0) {
+      return defaultCats.slice(0, 4);
+    }
+    return combined;
+  }, [notes, selectedBook]);
+
+  // Reset category filter to 'All' when user switches books
+  const handleSelectBook = (book: string) => {
+    setSelectedBook(book);
+    setSelectedCategory('All');
+  };
+
+  const handleAddBook = (newBookName: string) => {
+    setSelectedBook(newBookName);
+    setSelectedCategory('All');
+    showToast(`เปิดเล่มหนังสือ "${newBookName}" แล้ว`);
+  };
+
+  // Category counts within the current book view
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    const sourceNotes = selectedBook === 'All' 
+      ? notes 
+      : notes.filter((n) => (n.book || 'ทั่วไป') === selectedBook);
+    
+    for (const note of sourceNotes) {
+      counts[note.category] = (counts[note.category] || 0) + 1;
+    }
+    return counts;
+  }, [notes, selectedBook]);
 
   // Filtered and Sorted Notes
   const filteredNotes = useMemo(() => {
     return notes
       .filter((note) => {
+        // Book Filter (Hierarchical Top Level)
+        if (selectedBook !== 'All') {
+          const noteBook = note.book || 'ทั่วไป';
+          if (noteBook !== selectedBook) return false;
+        }
+
+        // Category Filter (Second Level)
+        if (selectedCategory !== 'All' && note.category !== selectedCategory) {
+          return false;
+        }
+
         // Search Filter
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
           const matchTitle = note.title.toLowerCase().includes(q);
           const matchContent = note.content.toLowerCase().includes(q);
           const matchCategory = note.category.toLowerCase().includes(q);
+          const matchBook = (note.book || 'ทั่วไป').toLowerCase().includes(q);
           const matchTags = note.tags?.some((t) => t.toLowerCase().includes(q));
-          if (!matchTitle && !matchContent && !matchCategory && !matchTags) {
+          if (!matchTitle && !matchContent && !matchCategory && !matchBook && !matchTags) {
             return false;
           }
-        }
-
-        // Category Filter
-        if (selectedCategory !== 'All' && note.category !== selectedCategory) {
-          return false;
         }
 
         // Pinned Only
@@ -110,7 +161,7 @@ export function App() {
         const timeB = new Date(b.updatedAt || b.createdAt).getTime();
         return timeB - timeA;
       });
-  }, [notes, searchQuery, selectedCategory, showPinnedOnly, showCompletedOnly]);
+  }, [notes, searchQuery, selectedBook, selectedCategory, showPinnedOnly, showCompletedOnly]);
 
   // Actions
   const handleSaveNote = (noteData: Omit<PostItNote, 'id' | 'createdAt' | 'updatedAt'>, id?: string) => {
@@ -186,13 +237,22 @@ export function App() {
     setIsModalOpen(true);
   };
 
-  const pinnedCount = useMemo(() => notes.filter((n) => n.isPinned).length, [notes]);
+  const currentBookNotesCount = useMemo(() => {
+    if (selectedBook === 'All') return notes.length;
+    return notes.filter((n) => (n.book || 'ทั่วไป') === selectedBook).length;
+  }, [notes, selectedBook]);
+
+  const pinnedCount = useMemo(() => {
+    const sourceNotes = selectedBook === 'All' 
+      ? notes 
+      : notes.filter((n) => (n.book || 'ทั่วไป') === selectedBook);
+    return sourceNotes.filter((n) => n.isPinned).length;
+  }, [notes, selectedBook]);
 
   return (
     <div className="min-h-screen bg-muji-grid flex flex-col selection:bg-[#EAE6DE] selection:text-[#2D2824]">
       
-      {/* Toast Notification (Minimalist Muji Style) */}
-      {/* Toast Notification (Comfortable pill) */}
+      {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-[#2D2824] text-[#FAF8F5] dark:bg-[#ECE9E4] dark:text-[#1D1B1A] shadow-xl border border-black/10 dark:border-white/10 text-sm font-medium animate-slideUp">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 dark:text-emerald-600 stroke-[2.5]" />
@@ -213,12 +273,23 @@ export function App() {
         totalNotes={notes.length}
       />
 
-      {/* Main Board Container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-8">
+      {/* Main Board Container (Widescreen fluid layout max-w-[1700px]) */}
+      <main className="flex-1 max-w-[1700px] w-full mx-auto px-4 sm:px-8 lg:px-12 py-7">
         
-        {/* Category Filter */}
+        {/* Level 1: Book Filter (หนังสือ) */}
+        <BookFilter
+          books={allBooks}
+          selectedBook={selectedBook}
+          onSelectBook={handleSelectBook}
+          onAddBook={handleAddBook}
+          bookCounts={bookCounts}
+          totalNotes={notes.length}
+        />
+
+        {/* Level 2: Category Filter & Breadcrumb (หมวดหมู่) */}
         <CategoryFilter
-          categories={allCategories}
+          selectedBook={selectedBook}
+          categories={availableCategories}
           selectedCategory={selectedCategory}
           onSelectCategory={setSelectedCategory}
           showPinnedOnly={showPinnedOnly}
@@ -226,13 +297,14 @@ export function App() {
           showCompletedOnly={showCompletedOnly}
           onToggleCompletedOnly={() => setShowCompletedOnly(!showCompletedOnly)}
           categoryCounts={categoryCounts}
-          totalNotes={notes.length}
+          totalNotes={currentBookNotesCount}
+          filteredCount={filteredNotes.length}
           pinnedCount={pinnedCount}
         />
 
-        {/* Post-it Notes Grid (3 Columns on Large Screens for Generous Card Width) */}
+        {/* Level 3: Post-it Notes Grid (Adaptive 4-5 cols on wide screens) */}
         {filteredNotes.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7 items-start">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5 sm:gap-6 items-start">
             {filteredNotes.map((note) => (
               <PostItCard
                 key={note.id}
@@ -256,6 +328,8 @@ export function App() {
             <p className="text-sm text-[#8A857D] dark:text-[#8C8780] mb-6 leading-relaxed">
               {searchQuery
                 ? `ไม่มีข้อความที่ตรงกับ "${searchQuery}"`
+                : selectedBook !== 'All'
+                ? `ยังไม่มีโน้ตในเล่ม "${selectedBook}" เริ่มต้นสร้างโพสต์อิทแรกในเล่มนี้ได้เลย`
                 : 'เริ่มต้นสร้างโพสต์อิทใหม่เพื่อบันทึกงาน ไอเดีย และสิ่งที่ต้องทำ'}
             </p>
             <button
@@ -271,7 +345,6 @@ export function App() {
           </div>
         )}
 
-
       </main>
 
       {/* Post-it Modal (Create/Edit) */}
@@ -283,7 +356,9 @@ export function App() {
         }}
         onSave={handleSaveNote}
         editingNote={editingNote}
-        categories={allCategories}
+        categories={availableCategories}
+        books={allBooks}
+        defaultBook={selectedBook !== 'All' ? selectedBook : 'ทั่วไป'}
       />
 
     </div>

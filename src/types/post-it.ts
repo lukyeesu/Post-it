@@ -20,6 +20,7 @@ export type NoteCategory =
 
 export interface PostItNote {
   id: string;
+  book?: string; // ชื่อเล่มหนังสือ เช่น "กีฬา", "งาน", "ทั่วไป"
   title: string;
   content: string;
   category: string;
