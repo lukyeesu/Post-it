@@ -177,6 +177,16 @@ function setupSheet() {
   const sheet = getOrCreateSheet();
   ensureHeadersAndSchema(sheet);
 
+  // ลบแถวระบบ __SYSTEM_TAXONOMY__ ออกหากมีตกค้าง เพื่อให้ชีตสะอาดตา 100% มีเฉพาะโพสต์อิทจริง
+  const currentData = sheet.getDataRange().getValues();
+  for (let i = currentData.length - 1; i >= 1; i--) {
+    const rowId = String(currentData[i][0]);
+    const rowBook = String(currentData[i][11]);
+    if (rowId === '__SYSTEM_TAXONOMY__' || rowBook === 'ระบบ') {
+      sheet.deleteRow(i + 1);
+    }
+  }
+
   const lastRow = sheet.getLastRow();
   if (lastRow > 1) {
     // ตรวจสอบคอลัมน์ L (book) ว่างหรือไม่ ถ้าว่างให้เติม 'ทั่วไป'
@@ -248,7 +258,8 @@ function doGet(e) {
       return jsonResponse({ status: 'success', count: 0, notes: [] });
     }
 
-    const allNotes = parseRowsToNotes(data.slice(1));
+    let allNotes = parseRowsToNotes(data.slice(1));
+    allNotes = allNotes.filter(n => n.id !== '__SYSTEM_TAXONOMY__' && n.book !== 'ระบบ' && n.category !== 'ระบบ');
 
     // 2. ดึงโน้ตเฉพาะตัวตาม ID
     if (action === 'getNote') {
@@ -420,7 +431,8 @@ function doPost(e) {
     // 6. BULK SYNC (Full Replacement)
     // -----------------------------------------------------------------
     if (action === 'sync') {
-      const notes = payload.notes || [];
+      const rawNotes = payload.notes || [];
+      const notes = rawNotes.filter(n => n && n.id !== '__SYSTEM_TAXONOMY__' && n.book !== 'ระบบ' && n.category !== 'ระบบ');
       const lastRow = sheet.getLastRow();
       
       // ลบข้อมูลเดิมทั้งหมดยกเว้นแถวที่ 1 (Header)

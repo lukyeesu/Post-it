@@ -168,30 +168,12 @@ export const storageService = {
       let extractedBoards: string[] = [];
       let extractedCategories: string[] = [];
 
-      // Detect and extract taxonomy system note
-      const taxonomyNote = data.notes.find((n: PostItNote) => n.id === SYSTEM_TAXONOMY_ID);
-      if (taxonomyNote) {
-        try {
-          const parsed = JSON.parse(taxonomyNote.content);
-          if (Array.isArray(parsed.boards)) {
-            extractedBoards = parsed.boards;
-            this.saveCustomBoards(parsed.boards);
-          }
-          if (Array.isArray(parsed.categories)) {
-            extractedCategories = parsed.categories;
-            this.saveCustomCategories(parsed.categories);
-          }
-        } catch (err) {
-          console.warn('Failed to parse taxonomy metadata note:', err);
-        }
-      }
-
-      // Filter out system note from user-facing notes
+      // Filter out any system notes from user-facing notes
       const existingLocalNotes = this.getNotes();
       const existingLocalMap = new Map(existingLocalNotes.map((n) => [n.id, n]));
 
       const userNotes = data.notes
-        .filter((n: PostItNote) => n.id !== SYSTEM_TAXONOMY_ID)
+        .filter((n: PostItNote) => n.id !== SYSTEM_TAXONOMY_ID && n.category !== 'ระบบ' && n.book !== 'ระบบ')
         .map((n: PostItNote, idx: number) => {
           const localNote = existingLocalMap.get(n.id);
           // If sheet returned a valid book, use it!
@@ -212,7 +194,7 @@ export const storageService = {
       const booksFromNotes = userNotes
         .map((n: PostItNote) => (n.book || '').trim())
         .filter((b: string) => b && b !== 'ทั่วไป' && b !== 'ระบบ');
-      const allExtractedBoards = Array.from(new Set([...localBoards, ...extractedBoards, ...booksFromNotes]));
+      const allExtractedBoards = Array.from(new Set([...localBoards, ...booksFromNotes]));
       if (allExtractedBoards.length > 0) {
         this.saveCustomBoards(allExtractedBoards);
       }
@@ -221,7 +203,7 @@ export const storageService = {
       const catsFromNotes = userNotes
         .map((n: PostItNote) => (n.category || '').trim())
         .filter((c: string) => c && c !== 'ทั่วไป' && c !== 'ระบบ');
-      const allExtractedCats = Array.from(new Set([...localCats, ...extractedCategories, ...catsFromNotes]));
+      const allExtractedCats = Array.from(new Set([...localCats, ...catsFromNotes]));
       if (allExtractedCats.length > 0) {
         this.saveCustomCategories(allExtractedCats);
       }
@@ -297,14 +279,14 @@ export const storageService = {
     if (boards) this.saveCustomBoards(boards);
     if (categories) this.saveCustomCategories(categories);
 
-    // Build the system taxonomy note containing all boards and categories
-    const taxonomyNote = this.buildTaxonomyNote(effectiveBoards, effectiveCategories);
-    const cleanUserNotes = notes.filter((n) => n.id !== SYSTEM_TAXONOMY_ID);
-    const allNotesToSync = [taxonomyNote, ...cleanUserNotes];
+    // Only sync real user notes - No system/taxonomy metadata rows in Google Sheets!
+    const cleanUserNotes = notes.filter(
+      (n) => n.id !== SYSTEM_TAXONOMY_ID && n.category !== 'ระบบ' && n.book !== 'ระบบ'
+    );
 
     const data = await this.postToApi(webAppUrl, {
       action: 'sync',
-      notes: allNotesToSync,
+      notes: cleanUserNotes,
     });
 
     return data.message || 'ซิงค์ข้อมูลสำเร็จ';

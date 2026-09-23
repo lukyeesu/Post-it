@@ -74,8 +74,10 @@ export const CategoryFilter: React.FC<CategoryFilterProps> = ({
             หมวดหมู่ทั้งหมด ({totalNotes})
           </button>
 
-          {categories.map((cat) => {
-            const count = categoryCounts[cat] || 0;
+          {categories
+            .filter((cat) => (categoryCounts[cat] || 0) > 0)
+            .map((cat) => {
+              const count = categoryCounts[cat] || 0;
             const isSelected = selectedCategory === cat;
             return (
               <button

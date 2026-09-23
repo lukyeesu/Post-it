@@ -116,17 +116,17 @@ export const PostItCardPreview: React.FC<{ note: PostItNote }> = ({ note }) => {
       className={`border rounded-3xl p-5 sm:p-6 shadow-2xl flex flex-col justify-between min-h-[200px] sm:min-h-[220px] ${theme.bg} ${theme.border} pointer-events-none select-none`}
     >
       <div>
-        <div className="flex items-center gap-1.5 text-xs mb-3">
-          <span className={`font-semibold px-2.5 py-1 rounded-xl flex items-center gap-1 tracking-tight ${theme.tagBg}`}>
-            <LayoutGrid className="w-3 h-3 opacity-70" />
-            <span>{note.book || 'ทั่วไป'}</span>
-          </span>
-          <span className="text-[#8A857D] dark:text-[#8C8780] font-normal">›</span>
-          <span className={`font-semibold px-2.5 py-1 rounded-xl tracking-tight ${theme.tagBg}`}>
-            {note.category}
-          </span>
+        <div className="flex items-center gap-1.5 text-xs mb-3 min-w-0">
+          <div 
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs tracking-tight ${theme.tagBg} min-w-0 max-w-full`}
+          >
+            <LayoutGrid className="w-3.5 h-3.5 opacity-70 shrink-0" />
+            <span className="font-medium opacity-80 shrink-0">{note.book || 'ทั่วไป'}</span>
+            <span className="opacity-40 text-[10px] shrink-0 select-none">›</span>
+            <span className="font-semibold truncate min-w-0">{note.category}</span>
+          </div>
           {note.isPinned && (
-            <Pin className="w-3.5 h-3.5 fill-[#B45309] text-[#B45309] dark:fill-[#D97706] dark:text-[#D97706]" />
+            <Pin className="w-3.5 h-3.5 fill-[#B45309] text-[#B45309] dark:fill-[#D97706] dark:text-[#D97706] shrink-0" />
           )}
         </div>
         <h3 className={`font-bold text-base sm:text-lg mb-2 leading-snug tracking-tight ${theme.textColor}`}>
@@ -338,19 +338,20 @@ export const PostItCard: React.FC<PostItCardProps> = ({
       >
         <div>
           {/* Top Header: Book > Category & Action Buttons */}
-          <div className="flex items-center justify-between gap-2 mb-3">
-            {/* Book > Category Hierarchy */}
-            <div className="flex items-center flex-wrap gap-1.5 text-xs">
-              <span className={`font-semibold px-2.5 py-1 rounded-xl flex items-center gap-1 tracking-tight ${theme.tagBg}`}>
-                <LayoutGrid className="w-3 h-3 opacity-70" />
-                <span>{note.book || 'ทั่วไป'}</span>
-              </span>
-              <span className="text-[#8A857D] dark:text-[#8C8780] font-normal">›</span>
-              <span className={`font-semibold px-2.5 py-1 rounded-xl tracking-tight ${theme.tagBg}`}>
-                {note.category}
-              </span>
+          <div className="flex items-center justify-between gap-2 mb-3 min-w-0">
+            {/* Book > Category Hierarchy (Sleek unified breadcrumb pill) */}
+            <div className="flex items-center min-w-0 gap-1.5 flex-1">
+              <div 
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs tracking-tight ${theme.tagBg} min-w-0 max-w-full`}
+                title={`${note.book || 'ทั่วไป'} › ${note.category}`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5 opacity-70 shrink-0" />
+                <span className="font-medium opacity-80 shrink-0">{note.book || 'ทั่วไป'}</span>
+                <span className="opacity-40 text-[10px] shrink-0 select-none">›</span>
+                <span className="font-semibold truncate min-w-0">{note.category}</span>
+              </div>
               {note.isPinned && (
-                <span title="ปักหมุดไว้บนสุด" className="p-0.5">
+                <span title="ปักหมุดไว้บนสุด" className="shrink-0 p-0.5">
                   <Pin className="w-3.5 h-3.5 fill-[#B45309] text-[#B45309] dark:fill-[#D97706] dark:text-[#D97706]" />
                 </span>
               )}
@@ -358,7 +359,7 @@ export const PostItCard: React.FC<PostItCardProps> = ({
 
             {/* Action Toolbar (Clicking here will NOT copy or trigger drag) */}
             <div 
-              className="flex items-center gap-1" 
+              className="flex items-center gap-0.5 shrink-0" 
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
             >
@@ -367,14 +368,14 @@ export const PostItCard: React.FC<PostItCardProps> = ({
                 type="button"
                 onClick={handleCopyButton}
                 onPointerDown={(e) => e.stopPropagation()}
-                className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+                className={`w-7.5 h-7.5 rounded-lg flex items-center justify-center transition-all ${
                   copied
                     ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 font-bold scale-105'
                     : 'hover:bg-black/5 dark:hover:bg-white/10 ' + theme.mutedText
                 }`}
                 title="คัดลอกเฉพาะเนื้อหา"
               >
-                {copied ? <Check className="w-4 h-4 stroke-[2.5]" /> : <Copy className="w-4 h-4" />}
+                {copied ? <Check className="w-3.5 h-3.5 stroke-[2.5]" /> : <Copy className="w-3.5 h-3.5" />}
               </button>
 
               {/* Pin Toggle */}
@@ -385,12 +386,12 @@ export const PostItCard: React.FC<PostItCardProps> = ({
                   onTogglePin(note.id);
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
-                className={`w-8 h-8 rounded-xl flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${
+                className={`w-7.5 h-7.5 rounded-lg flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${
                   note.isPinned ? 'text-[#B45309] dark:text-[#D97706]' : theme.mutedText
                 }`}
                 title={note.isPinned ? "ถอนหมุด" : "ปักหมุด"}
               >
-                <Pin className={`w-4 h-4 ${note.isPinned ? 'fill-current' : ''}`} />
+                <Pin className={`w-3.5 h-3.5 ${note.isPinned ? 'fill-current' : ''}`} />
               </button>
 
               {/* Edit */}
@@ -401,10 +402,10 @@ export const PostItCard: React.FC<PostItCardProps> = ({
                   onEdit(note);
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
-                className={`w-8 h-8 rounded-xl flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${theme.mutedText}`}
+                className={`w-7.5 h-7.5 rounded-lg flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${theme.mutedText}`}
                 title="แก้ไข"
               >
-                <Edit3 className="w-4 h-4" />
+                <Edit3 className="w-3.5 h-3.5" />
               </button>
 
               {/* Delete */}
@@ -415,10 +416,10 @@ export const PostItCard: React.FC<PostItCardProps> = ({
                   onDelete(note.id);
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
-                className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-rose-500/10 text-rose-500/80 hover:text-rose-600 transition-colors"
+                className="w-7.5 h-7.5 rounded-lg flex items-center justify-center hover:bg-rose-500/10 text-rose-500/80 hover:text-rose-600 transition-colors"
                 title="ลบ"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>

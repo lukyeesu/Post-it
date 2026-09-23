@@ -310,18 +310,20 @@ export function App() {
     return notes.filter((n) => n.id !== '__SYSTEM_TAXONOMY__' && (n.book || 'ทั่วไป').trim() === selectedBook.trim()).length;
   }, [notes, selectedBook]);
 
-  // Available categories for the currently active board
+  // Available categories for the currently active board: ONLY show categories that actually have items in this board
   const availableCategories = useMemo(() => {
     const sourceNotes = selectedBook === 'All' 
       ? notes.filter((n) => n.id !== '__SYSTEM_TAXONOMY__')
       : notes.filter((n) => n.id !== '__SYSTEM_TAXONOMY__' && (n.book || 'ทั่วไป').trim() === selectedBook.trim());
 
-    const noteCategories = sourceNotes.map((n) => n.category.trim()).filter(Boolean);
-    const combined = Array.from(new Set([...noteCategories, ...customCategories.map((c) => c.trim())]));
-    const filtered = combined.filter((c) => !deletedCategories.map((d) => d.trim()).includes(c));
+    const noteCategories = Array.from(new Set(
+      sourceNotes
+        .map((n) => (n.category || 'ทั่วไป').trim())
+        .filter(Boolean)
+    )).filter((c) => !deletedCategories.map((d) => d.trim()).includes(c));
     
-    return filtered.length > 0 ? filtered : allCategoriesGlobal;
-  }, [notes, selectedBook, customCategories, deletedCategories, allCategoriesGlobal]);
+    return noteCategories;
+  }, [notes, selectedBook, deletedCategories]);
 
   // Reset category filter to 'All' when user switches boards
   const handleSelectBook = (book: string) => {
@@ -541,6 +543,13 @@ export function App() {
     return counts;
   }, [notes, selectedBook]);
 
+  // If the active category has 0 notes in the newly selected board, reset to 'All'
+  useEffect(() => {
+    if (selectedCategory !== 'All' && (!categoryCounts[selectedCategory] || categoryCounts[selectedCategory] === 0)) {
+      setSelectedCategory('All');
+    }
+  }, [selectedCategory, categoryCounts]);
+
   // Filtered and Sorted Notes
   const filteredNotes = useMemo(() => {
     return notes
@@ -600,9 +609,28 @@ export function App() {
       });
   }, [notes, searchQuery, selectedBook, selectedCategory, showPinnedOnly, showCompletedOnly]);
 
-  // Compute Masonry Grid Columns dynamically (Responsive 1 to 5 columns)
-  const columnCount = useMemo(() => {
-    return 5; // Target max for widescreen layout
+  // Compute Masonry Grid Columns dynamically (Responsive 1 to 4/5 columns matching viewport)
+  const [columnCount, setColumnCount] = useState(() => {
+    if (typeof window === 'undefined') return 4;
+    const w = window.innerWidth;
+    if (w < 640) return 1;
+    if (w < 1024) return 2;
+    if (w < 1536) return 3;
+    if (w < 1920) return 4;
+    return 5;
+  });
+
+  useEffect(() => {
+    const updateColumns = () => {
+      const w = window.innerWidth;
+      if (w < 640) setColumnCount(1);
+      else if (w < 1024) setColumnCount(2);
+      else if (w < 1536) setColumnCount(3);
+      else if (w < 1920) setColumnCount(4);
+      else setColumnCount(5);
+    };
+    window.addEventListener('resize', updateColumns);
+    return () => window.removeEventListener('resize', updateColumns);
   }, []);
 
   const columnNotes = useMemo(() => {
@@ -924,7 +952,10 @@ export function App() {
 
         {/* Level 3: Post-it Notes Masonry (Fluid vertical stacking with zero gaps) */}
         {filteredNotes.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5 sm:gap-6 items-start">
+          <div 
+            className="grid gap-5 sm:gap-6 items-start"
+            style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
+          >
             {columnNotes.map((col, colIdx) => (
               <div key={colIdx} className="flex flex-col gap-5 sm:gap-6">
                 {col.map((note) => (
