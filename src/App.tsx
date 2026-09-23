@@ -1,16 +1,19 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Navbar } from '@/components/Navbar';
 import { BookFilter } from '@/components/BookFilter';
 import { CategoryFilter } from '@/components/CategoryFilter';
-import { PostItCard } from '@/components/PostItCard';
+import { PostItCard, PostItCardPreview } from '@/components/PostItCard';
 import { PostItModal } from '@/components/PostItModal';
 import { ManageTaxonomyModal } from '@/components/ManageTaxonomyModal';
 import { PostItNote, GoogleSheetsConfig } from '@/types/post-it';
 import { storageService, DEFAULT_SHEETS_URL } from '@/services/storageService';
 import { Plus, StickyNote, CheckCircle2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { useConfirm } from '@/context/ConfirmContext';
 
 export function App() {
+  const { confirm } = useConfirm();
+
   // 1. Core State
   const [notes, setNotes] = useState<PostItNote[]>(() => storageService.getNotes());
   const [sheetsConfig] = useState<GoogleSheetsConfig>(() => storageService.getSheetsConfig());
@@ -25,11 +28,84 @@ export function App() {
       window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
 
-  // 2. Modals State
+  // 2. Modals & Drag State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [editingNote, setEditingNote] = useState<PostItNote | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // 120 FPS Drag State (Ref-based pointer tracking to prevent React re-renders while moving)
+  const [activeDragNote, setActiveDragNote] = useState<PostItNote | null>(null);
+  const [activeDragWidth, setActiveDragWidth] = useState<number>(300);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+
+  const dragCardRef = useRef<HTMLDivElement>(null);
+  const initialPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const dragStateRef = useRef<{
+    note: PostItNote;
+    offsetX: number;
+    offsetY: number;
+    targetId: string | null;
+    cardRects: { id: string; rect: DOMRect }[];
+  } | null>(null);
+
+  // Global Pointer Event Listeners (Zero React re-renders during pointermove)
+  useEffect(() => {
+    if (!activeDragNote) return;
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!dragStateRef.current || !dragCardRef.current) return;
+      const { offsetX, offsetY, cardRects } = dragStateRef.current;
+      const x = e.clientX - offsetX;
+      const y = e.clientY - offsetY;
+
+      // 120 FPS Direct GPU transform without triggering React component tree re-renders
+      dragCardRef.current.style.transform = `translate3d(${x}px, ${y}px, 0) scale(1.04) rotate(1.5deg)`;
+
+      // Test against cached card boundaries (< 0.01ms, no DOM layout thrashing)
+      let newTargetId: string | null = null;
+      for (let i = 0; i < cardRects.length; i++) {
+        const r = cardRects[i].rect;
+        if (
+          e.clientX >= r.left &&
+          e.clientX <= r.right &&
+          e.clientY >= r.top &&
+          e.clientY <= r.bottom
+        ) {
+          newTargetId = cardRects[i].id;
+          break;
+        }
+      }
+
+      // Only trigger React state change when drop target actually changes
+      if (newTargetId !== dragStateRef.current.targetId) {
+        dragStateRef.current.targetId = newTargetId;
+        setDropTargetId(newTargetId);
+      }
+    };
+
+    const handlePointerUp = () => {
+      if (dragStateRef.current) {
+        const { note, targetId } = dragStateRef.current;
+        if (targetId && targetId !== note.id) {
+          handleReorderNotes(note.id, targetId);
+        }
+        dragStateRef.current = null;
+      }
+      setActiveDragNote(null);
+      setDropTargetId(null);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+    };
+  }, [activeDragNote]);
 
   // Sync dark mode class to <html>
   useEffect(() => {
@@ -42,14 +118,13 @@ export function App() {
     }
   }, [darkMode]);
 
-  // 1.1 Custom & Deleted Boards & Categories State (Persisted in LocalStorage)
+  // 1.1 Custom & Deleted Boards & Categories State (Persisted in LocalStorage & Google Sheets)
   const [customCategories, setCustomCategories] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('webapp_post_it_custom_categories_v1');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
+    const saved = storageService.getCustomCategories();
+    const fromNotes = storageService.getNotes()
+      .map((n) => (n.category || '').trim())
+      .filter((c) => c && c !== 'ทั่วไป' && c !== 'ระบบ');
+    return Array.from(new Set([...saved, ...fromNotes]));
   });
 
   const [deletedCategories, setDeletedCategories] = useState<string[]>(() => {
@@ -62,12 +137,11 @@ export function App() {
   });
 
   const [customBoards, setCustomBoards] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('webapp_post_it_custom_boards_v1');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
+    const saved = storageService.getCustomBoards();
+    const fromNotes = storageService.getNotes()
+      .map((n) => (n.book || '').trim())
+      .filter((b) => b && b !== 'ทั่วไป' && b !== 'ระบบ');
+    return Array.from(new Set([...saved, ...fromNotes]));
   });
 
   const [deletedBoards, setDeletedBoards] = useState<string[]>(() => {
@@ -81,7 +155,7 @@ export function App() {
 
   // Sync boards and categories to localStorage
   useEffect(() => {
-    localStorage.setItem('webapp_post_it_custom_categories_v1', JSON.stringify(customCategories));
+    storageService.saveCustomCategories(customCategories);
   }, [customCategories]);
 
   useEffect(() => {
@@ -89,7 +163,7 @@ export function App() {
   }, [deletedCategories]);
 
   useEffect(() => {
-    localStorage.setItem('webapp_post_it_custom_boards_v1', JSON.stringify(customBoards));
+    storageService.saveCustomBoards(customBoards);
   }, [customBoards]);
 
   useEffect(() => {
@@ -116,15 +190,28 @@ export function App() {
     const fetchLatestFromSheets = async () => {
       try {
         setSyncStatus('syncing');
-        const remoteNotes = await storageService.fetchFromGoogleSheets(targetUrl);
+        const result = await storageService.fetchFromGoogleSheets(targetUrl);
         if (!isMounted) return;
 
-        if (Array.isArray(remoteNotes)) {
-          setNotes(remoteNotes);
-          storageService.saveNotes(remoteNotes);
+        if (result && Array.isArray(result.notes)) {
+          setNotes(result.notes);
+          storageService.saveNotes(result.notes);
+
+          // Merge boards from Google Sheets
+          if (Array.isArray(result.boards) && result.boards.length > 0) {
+            setCustomBoards((prev) => Array.from(new Set([...prev, ...result.boards])));
+          }
+
+          // Merge categories from Google Sheets
+          if (Array.isArray(result.categories) && result.categories.length > 0) {
+            setCustomCategories((prev) => Array.from(new Set([...prev, ...result.categories])));
+          }
+
           setSyncStatus('connected');
-          if (remoteNotes.length > 0) {
-            showToast(`เชื่อมต่อ Google Sheets แล้ว (พบข้อมูล ${remoteNotes.length} รายการ) ☁️`);
+          const totalNotes = result.notes.length;
+          const totalBoards = result.boards?.length || 0;
+          if (totalNotes > 0 || totalBoards > 0) {
+            showToast(`เชื่อมต่อ Google Sheets แล้ว (พบโน้ต ${totalNotes} รายการ, บอร์ด ${totalBoards} บอร์ด) ☁️`);
           }
         }
       } catch (err) {
@@ -148,15 +235,23 @@ export function App() {
     try {
       setSyncStatus('syncing');
       showToast('กำลังซิงค์ข้อมูลกับ Google Sheets...');
-      const remoteNotes = await storageService.fetchFromGoogleSheets(targetUrl);
-      if (Array.isArray(remoteNotes) && remoteNotes.length > 0) {
-        setNotes(remoteNotes);
-        storageService.saveNotes(remoteNotes);
+      const result = await storageService.fetchFromGoogleSheets(targetUrl);
+      if (result && Array.isArray(result.notes)) {
+        setNotes(result.notes);
+        storageService.saveNotes(result.notes);
+
+        if (Array.isArray(result.boards) && result.boards.length > 0) {
+          setCustomBoards((prev) => Array.from(new Set([...prev, ...result.boards])));
+        }
+        if (Array.isArray(result.categories) && result.categories.length > 0) {
+          setCustomCategories((prev) => Array.from(new Set([...prev, ...result.categories])));
+        }
+
         setSyncStatus('connected');
-        showToast(`ซิงค์ข้อมูลสำเร็จ (${remoteNotes.length} รายการ) ☁️`);
+        showToast(`ซิงค์ข้อมูลสำเร็จ (${result.notes.length} รายการ, ${result.boards?.length || 0} บอร์ด) ☁️`);
       } else {
         setSyncStatus('connected');
-        showToast('ซิงค์ข้อมูลเรียบร้อย (ไม่พบรายการใหม่)');
+        showToast('ซิงค์ข้อมูลเรียบร้อย');
       }
     } catch (err) {
       console.error('Sync failed:', err);
@@ -167,15 +262,19 @@ export function App() {
 
   // 5. Boards calculation (e.g. กีฬา, งาน, ทั่วไป)
   const allBooks = useMemo(() => {
-    const fromNotes = notes.map((n) => n.book || 'ทั่วไป').filter(Boolean);
-    const combined = Array.from(new Set(['ทั่วไป', ...fromNotes, ...customBoards]));
-    return combined.filter((b) => b === 'ทั่วไป' || !deletedBoards.includes(b));
+    const fromNotes = notes
+      .filter((n) => n.id !== '__SYSTEM_TAXONOMY__')
+      .map((n) => (n.book || 'ทั่วไป').trim())
+      .filter(Boolean);
+    const combined = Array.from(new Set(['ทั่วไป', ...fromNotes, ...customBoards.map((b) => b.trim())]));
+    return combined.filter((b) => b === 'ทั่วไป' || (!deletedBoards.map((d) => d.trim()).includes(b) && b !== 'ระบบ'));
   }, [notes, customBoards, deletedBoards]);
 
   const bookCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const note of notes) {
-      const b = note.book || 'ทั่วไป';
+      if (note.id === '__SYSTEM_TAXONOMY__') continue;
+      const b = (note.book || 'ทั่วไป').trim();
       counts[b] = (counts[b] || 0) + 1;
     }
     return counts;
@@ -183,9 +282,12 @@ export function App() {
 
   // 6. Categories list calculation: dynamically derived from DB notes and custom categories
   const allCategoriesGlobal = useMemo(() => {
-    const fromNotes = notes.map((n) => n.category).filter(Boolean);
-    const combined = Array.from(new Set([...fromNotes, ...customCategories]));
-    const filtered = combined.filter((c) => !deletedCategories.includes(c));
+    const fromNotes = notes
+      .filter((n) => n.id !== '__SYSTEM_TAXONOMY__')
+      .map((n) => n.category.trim())
+      .filter(Boolean);
+    const combined = Array.from(new Set([...fromNotes, ...customCategories.map((c) => c.trim())]));
+    const filtered = combined.filter((c) => !deletedCategories.map((d) => d.trim()).includes(c) && c !== 'ระบบ');
     return filtered.length > 0 ? filtered : ['ทั่วไป'];
   }, [notes, customCategories, deletedCategories]);
 
@@ -193,132 +295,179 @@ export function App() {
   const globalCategoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const note of notes) {
+      if (note.id === '__SYSTEM_TAXONOMY__') continue;
       if (note.category) {
-        counts[note.category] = (counts[note.category] || 0) + 1;
+        counts[note.category.trim()] = (counts[note.category.trim()] || 0) + 1;
       }
     }
     return counts;
   }, [notes]);
 
+  const currentBookNotesCount = useMemo(() => {
+    if (selectedBook === 'All') {
+      return notes.filter((n) => n.id !== '__SYSTEM_TAXONOMY__').length;
+    }
+    return notes.filter((n) => n.id !== '__SYSTEM_TAXONOMY__' && (n.book || 'ทั่วไป').trim() === selectedBook.trim()).length;
+  }, [notes, selectedBook]);
+
+  // Available categories for the currently active board
   const availableCategories = useMemo(() => {
     const sourceNotes = selectedBook === 'All' 
-      ? notes 
-      : notes.filter((n) => (n.book || 'ทั่วไป') === selectedBook);
-    
-    const catsFromNotes = sourceNotes.map((n) => n.category).filter(Boolean);
-    const combined = Array.from(new Set([...catsFromNotes, ...customCategories]));
-    const filtered = combined.filter((c) => !deletedCategories.includes(c));
+      ? notes.filter((n) => n.id !== '__SYSTEM_TAXONOMY__')
+      : notes.filter((n) => n.id !== '__SYSTEM_TAXONOMY__' && (n.book || 'ทั่วไป').trim() === selectedBook.trim());
+
+    const noteCategories = sourceNotes.map((n) => n.category.trim()).filter(Boolean);
+    const combined = Array.from(new Set([...noteCategories, ...customCategories.map((c) => c.trim())]));
+    const filtered = combined.filter((c) => !deletedCategories.map((d) => d.trim()).includes(c));
     
     return filtered.length > 0 ? filtered : allCategoriesGlobal;
   }, [notes, selectedBook, customCategories, deletedCategories, allCategoriesGlobal]);
 
   // Reset category filter to 'All' when user switches boards
   const handleSelectBook = (book: string) => {
-    setSelectedBook(book);
+    setSelectedBook(book.trim());
     setSelectedCategory('All');
   };
 
   const handleAddBook = (newBookName: string) => {
     const trimmed = newBookName.trim();
     if (!trimmed) return;
-    setCustomBoards((prev) => Array.from(new Set([...prev, trimmed])));
-    setDeletedBoards((prev) => prev.filter((b) => b !== trimmed));
+    const updatedBoards = Array.from(new Set([...customBoards, trimmed]));
+    setCustomBoards(updatedBoards);
+    storageService.saveCustomBoards(updatedBoards);
+    setDeletedBoards((prev) => prev.filter((b) => b.trim() !== trimmed));
     setSelectedBook(trimmed);
     setSelectedCategory('All');
-    showToast(`เปิดบอร์ด "${trimmed}" แล้ว`);
+    showToast(`เปิดบอร์ด "${trimmed}" แล้ว ☁️`);
+
+    // Sync to Google Sheets immediately
+    const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
+    if (targetUrl) {
+      setSyncStatus('syncing');
+      storageService.syncToGoogleSheets(targetUrl, notes, updatedBoards, customCategories)
+        .then(() => setSyncStatus('connected'))
+        .catch(() => setSyncStatus('connected'));
+    }
   };
 
   // 7. Board Management Handlers (Rename & Delete)
   const handleRenameBoard = (oldName: string, newName: string) => {
-    const trimmed = newName.trim();
-    if (!trimmed || trimmed === oldName) return;
+    const trimmedOld = oldName.trim();
+    const trimmedNew = newName.trim();
+    if (!trimmedNew || trimmedNew === trimmedOld) return;
 
-    setCustomBoards((prev) => prev.map((b) => (b === oldName ? trimmed : b)));
-    setDeletedBoards((prev) => [...prev.filter((b) => b !== trimmed), oldName]);
+    const baseBoards = Array.from(new Set([...customBoards.map((b) => b.trim()), trimmedOld]));
+    const updatedBoards = baseBoards.map((b) => (b === trimmedOld ? trimmedNew : b));
+    setCustomBoards(updatedBoards);
+    storageService.saveCustomBoards(updatedBoards);
+    setDeletedBoards((prev) => [...prev.filter((b) => b.trim() !== trimmedNew), trimmedOld]);
 
     const updatedNotes = notes.map((n) => {
-      const currentBook = n.book || 'ทั่วไป';
-      if (currentBook === oldName) {
-        return { ...n, book: trimmed, updatedAt: new Date().toISOString() };
+      const currentBook = (n.book || 'ทั่วไป').trim();
+      if (currentBook === trimmedOld) {
+        return { ...n, book: trimmedNew, updatedAt: new Date().toISOString() };
       }
       return n;
     });
     setNotes(updatedNotes);
-    if (selectedBook === oldName) {
-      setSelectedBook(trimmed);
+    storageService.saveNotes(updatedNotes);
+
+    if (selectedBook.trim() === trimmedOld) {
+      setSelectedBook(trimmedNew);
     }
-    showToast(`เปลี่ยนชื่อบอร์ดเป็น "${trimmed}" แล้ว`);
+    showToast(`เปลี่ยนชื่อบอร์ดเป็น "${trimmedNew}" แล้ว ☁️`);
 
     // Sync with Google Sheets
     const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
-    setSyncStatus('syncing');
-    storageService.syncToGoogleSheets(targetUrl, updatedNotes)
-      .then(() => setSyncStatus('connected'))
-      .catch(() => setSyncStatus('connected'));
+    if (targetUrl) {
+      setSyncStatus('syncing');
+      storageService.syncToGoogleSheets(targetUrl, updatedNotes, updatedBoards, customCategories)
+        .then(() => setSyncStatus('connected'))
+        .catch(() => setSyncStatus('connected'));
+    }
   };
 
   const handleDeleteBoard = (boardName: string) => {
-    if (boardName === 'ทั่วไป') {
+    const trimmed = boardName.trim();
+    if (trimmed === 'ทั่วไป') {
       showToast('ไม่สามารถลบบอร์ดทั่วไปได้');
       return;
     }
 
-    setDeletedBoards((prev) => Array.from(new Set([...prev, boardName])));
-    setCustomBoards((prev) => prev.filter((b) => b !== boardName));
+    const updatedDeleted = Array.from(new Set([...deletedBoards.map((b) => b.trim()), trimmed]));
+    const updatedBoards = customBoards.filter((b) => b.trim() !== trimmed);
+    setDeletedBoards(updatedDeleted);
+    setCustomBoards(updatedBoards);
+    storageService.saveCustomBoards(updatedBoards);
 
     // Reassign all notes in this board to 'ทั่วไป'
     const updatedNotes = notes.map((n) => {
-      const currentBook = n.book || 'ทั่วไป';
-      if (currentBook === boardName) {
+      const currentBook = (n.book || 'ทั่วไป').trim();
+      if (currentBook === trimmed) {
         return { ...n, book: 'ทั่วไป', updatedAt: new Date().toISOString() };
       }
       return n;
     });
     setNotes(updatedNotes);
-    if (selectedBook === boardName) {
+    storageService.saveNotes(updatedNotes);
+
+    if (selectedBook.trim() === trimmed) {
       setSelectedBook('All');
     }
-    showToast(`ลบบอร์ด "${boardName}" แล้ว (ย้ายโน้ตไปบอร์ดทั่วไป)`);
+    showToast(`ลบบอร์ด "${trimmed}" แล้ว (ย้ายโน้ตไปบอร์ดทั่วไป) ☁️`);
 
     // Sync with Google Sheets
     const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
-    setSyncStatus('syncing');
-    storageService.syncToGoogleSheets(targetUrl, updatedNotes)
-      .then(() => setSyncStatus('connected'))
-      .catch(() => setSyncStatus('connected'));
+    if (targetUrl) {
+      setSyncStatus('syncing');
+      storageService.syncToGoogleSheets(targetUrl, updatedNotes, updatedBoards, customCategories)
+        .then(() => setSyncStatus('connected'))
+        .catch(() => setSyncStatus('connected'));
+    }
   };
 
   // 8. Category Management Handlers (Rename & Delete)
   const handleRenameCategory = (oldName: string, newName: string) => {
-    const trimmed = newName.trim();
-    if (!trimmed || trimmed === oldName) return;
+    const trimmedOld = oldName.trim();
+    const trimmedNew = newName.trim();
+    if (!trimmedNew || trimmedNew === trimmedOld) return;
 
-    setCustomCategories((prev) => prev.map((c) => (c === oldName ? trimmed : c)));
-    setDeletedCategories((prev) => [...prev.filter((c) => c !== trimmed), oldName]);
+    const baseCats = Array.from(new Set([...customCategories.map((c) => c.trim()), trimmedOld]));
+    const updatedCats = baseCats.map((c) => (c === trimmedOld ? trimmedNew : c));
+    setCustomCategories(updatedCats);
+    storageService.saveCustomCategories(updatedCats);
+    setDeletedCategories((prev) => [...prev.filter((c) => c.trim() !== trimmedNew), trimmedOld]);
 
     const updatedNotes = notes.map((n) => {
-      if (n.category === oldName) {
-        return { ...n, category: trimmed, updatedAt: new Date().toISOString() };
+      if ((n.category || '').trim() === trimmedOld) {
+        return { ...n, category: trimmedNew, updatedAt: new Date().toISOString() };
       }
       return n;
     });
     setNotes(updatedNotes);
-    if (selectedCategory === oldName) {
-      setSelectedCategory(trimmed);
+    storageService.saveNotes(updatedNotes);
+
+    if (selectedCategory.trim() === trimmedOld) {
+      setSelectedCategory(trimmedNew);
     }
-    showToast(`เปลี่ยนชื่อหมวดหมู่เป็น "${trimmed}" แล้ว`);
+    showToast(`เปลี่ยนชื่อหมวดหมู่เป็น "${trimmedNew}" แล้ว ☁️`);
 
     // Sync with Google Sheets
     const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
-    setSyncStatus('syncing');
-    storageService.syncToGoogleSheets(targetUrl, updatedNotes)
-      .then(() => setSyncStatus('connected'))
-      .catch(() => setSyncStatus('connected'));
+    if (targetUrl) {
+      setSyncStatus('syncing');
+      storageService.syncToGoogleSheets(targetUrl, updatedNotes, customBoards, updatedCats)
+        .then(() => setSyncStatus('connected'))
+        .catch(() => setSyncStatus('connected'));
+    }
   };
 
   const handleDeleteCategory = (catName: string) => {
-    setDeletedCategories((prev) => Array.from(new Set([...prev, catName])));
-    setCustomCategories((prev) => prev.filter((c) => c !== catName));
+    const updatedDeleted = Array.from(new Set([...deletedCategories, catName]));
+    const updatedCats = customCategories.filter((c) => c !== catName);
+    setDeletedCategories(updatedDeleted);
+    setCustomCategories(updatedCats);
+    storageService.saveCustomCategories(updatedCats);
 
     // Find fallback category for any notes in this category
     const remainingCats = allCategoriesGlobal.filter((c) => c !== catName);
@@ -343,15 +492,15 @@ export function App() {
 
     showToast(
       hasNotes
-        ? `ลบหมวดหมู่ "${catName}" แล้ว (ย้ายโน้ตไปหมวด "${fallbackCategory}")`
-        : `ลบหมวดหมู่ "${catName}" แล้ว`
+        ? `ลบหมวดหมู่ "${catName}" แล้ว (ย้ายโน้ตไปหมวด "${fallbackCategory}") ☁️`
+        : `ลบหมวดหมู่ "${catName}" แล้ว ☁️`
     );
 
-    if (hasNotes) {
-      // Sync with Google Sheets
-      const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
+    // Sync with Google Sheets
+    const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
+    if (targetUrl) {
       setSyncStatus('syncing');
-      storageService.syncToGoogleSheets(targetUrl, updatedNotes)
+      storageService.syncToGoogleSheets(targetUrl, updatedNotes, customBoards, updatedCats)
         .then(() => setSyncStatus('connected'))
         .catch(() => setSyncStatus('connected'));
     }
@@ -360,21 +509,34 @@ export function App() {
   const handleAddCategoryGlobal = (newCat: string) => {
     const trimmed = newCat.trim();
     if (!trimmed) return;
-    setCustomCategories((prev) => Array.from(new Set([...prev, trimmed])));
+    const updatedCats = Array.from(new Set([...customCategories, trimmed]));
+    setCustomCategories(updatedCats);
+    storageService.saveCustomCategories(updatedCats);
     setDeletedCategories((prev) => prev.filter((c) => c !== trimmed));
     setSelectedCategory(trimmed);
-    showToast(`สร้างหมวดหมู่ "${trimmed}" แล้ว`);
+    showToast(`สร้างหมวดหมู่ "${trimmed}" แล้ว ☁️`);
+
+    // Sync with Google Sheets
+    const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
+    if (targetUrl) {
+      setSyncStatus('syncing');
+      storageService.syncToGoogleSheets(targetUrl, notes, customBoards, updatedCats)
+        .then(() => setSyncStatus('connected'))
+        .catch(() => setSyncStatus('connected'));
+    }
   };
 
   // Category counts within current board view
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     const sourceNotes = selectedBook === 'All' 
-      ? notes 
-      : notes.filter((n) => (n.book || 'ทั่วไป') === selectedBook);
+      ? notes.filter((n) => n.id !== '__SYSTEM_TAXONOMY__')
+      : notes.filter((n) => n.id !== '__SYSTEM_TAXONOMY__' && (n.book || 'ทั่วไป').trim() === selectedBook.trim());
     
     for (const note of sourceNotes) {
-      counts[note.category] = (counts[note.category] || 0) + 1;
+      if (note.id === '__SYSTEM_TAXONOMY__') continue;
+      const cat = (note.category || 'ทั่วไป').trim();
+      counts[cat] = (counts[cat] || 0) + 1;
     }
     return counts;
   }, [notes, selectedBook]);
@@ -383,15 +545,19 @@ export function App() {
   const filteredNotes = useMemo(() => {
     return notes
       .filter((note) => {
+        // Exclude system taxonomy record
+        if (note.id === '__SYSTEM_TAXONOMY__') return false;
+
         // Board Filter
         if (selectedBook !== 'All') {
-          const noteBook = note.book || 'ทั่วไป';
-          if (noteBook !== selectedBook) return false;
+          const noteBook = (note.book || 'ทั่วไป').trim();
+          if (noteBook !== selectedBook.trim()) return false;
         }
 
         // Category Filter
-        if (selectedCategory !== 'All' && note.category !== selectedCategory) {
-          return false;
+        if (selectedCategory !== 'All') {
+          const noteCat = (note.category || 'ทั่วไป').trim();
+          if (noteCat !== selectedCategory.trim()) return false;
         }
 
         // Search Filter
@@ -399,7 +565,7 @@ export function App() {
           const q = searchQuery.toLowerCase();
           const matchTitle = note.title.toLowerCase().includes(q);
           const matchContent = note.content.toLowerCase().includes(q);
-          const matchCategory = note.category.toLowerCase().includes(q);
+          const matchCategory = (note.category || '').toLowerCase().includes(q);
           const matchBook = (note.book || 'ทั่วไป').toLowerCase().includes(q);
           const matchTags = note.tags?.some((t) => t.toLowerCase().includes(q));
           if (!matchTitle && !matchContent && !matchCategory && !matchBook && !matchTags) {
@@ -420,44 +586,25 @@ export function App() {
         return true;
       })
       .sort((a, b) => {
-        // Pinned notes first
-        if (a.isPinned && !b.isPinned) return -1;
-        if (!a.isPinned && b.isPinned) return 1;
+        // Respect Drag & Drop custom order
+        const orderA = typeof a.order === 'number' ? a.order : 0;
+        const orderB = typeof b.order === 'number' ? b.order : 0;
+        if (orderA !== orderB) {
+          return orderA - orderB;
+        }
 
-        // Newest updated / created first
+        // Fallback to timestamp if order is identical
         const timeA = new Date(a.updatedAt || a.createdAt).getTime();
         const timeB = new Date(b.updatedAt || b.createdAt).getTime();
         return timeB - timeA;
       });
   }, [notes, searchQuery, selectedBook, selectedCategory, showPinnedOnly, showCompletedOnly]);
 
-  // Responsive Masonry column count matching Tailwind breakpoints
-  const [columnCount, setColumnCount] = useState(() => {
-    if (typeof window === 'undefined') return 5;
-    const w = window.innerWidth;
-    if (w >= 1536) return 5;
-    if (w >= 1280) return 4;
-    if (w >= 768) return 3;
-    if (w >= 640) return 2;
-    return 1;
-  });
-
-  useEffect(() => {
-    const handleResize = () => {
-      const w = window.innerWidth;
-      let c = 1;
-      if (w >= 1536) c = 5;
-      else if (w >= 1280) c = 4;
-      else if (w >= 768) c = 3;
-      else if (w >= 640) c = 2;
-      setColumnCount((prev) => (prev !== c ? c : prev));
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+  // Compute Masonry Grid Columns dynamically (Responsive 1 to 5 columns)
+  const columnCount = useMemo(() => {
+    return 5; // Target max for widescreen layout
   }, []);
 
-  // Distribute notes into columns for Masonry layout (eliminating vertical empty gaps)
   const columnNotes = useMemo(() => {
     const cols: PostItNote[][] = Array.from({ length: columnCount }, () => []);
     filteredNotes.forEach((note, index) => {
@@ -470,21 +617,40 @@ export function App() {
   const handleSaveNote = (noteData: Omit<PostItNote, 'id' | 'createdAt' | 'updatedAt'>, id?: string) => {
     const now = new Date().toISOString();
     const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
+    const cleanBook = (noteData.book || 'ทั่วไป').trim();
+    const cleanCategory = (noteData.category || 'ทั่วไป').trim();
 
     // If user explicitly created or assigned a category/book, remove from deleted list
-    if (noteData.category) {
-      setDeletedCategories((prev) => prev.filter((c) => c !== noteData.category));
+    if (cleanCategory) {
+      setDeletedCategories((prev) => prev.filter((c) => c.trim() !== cleanCategory));
     }
-    if (noteData.book) {
-      setDeletedBoards((prev) => prev.filter((b) => b !== noteData.book));
+    if (cleanBook) {
+      setDeletedBoards((prev) => prev.filter((b) => b.trim() !== cleanBook));
+      if (cleanBook !== 'ทั่วไป' && !customBoards.map((b) => b.trim()).includes(cleanBook)) {
+        const nextBoards = Array.from(new Set([...customBoards, cleanBook]));
+        setCustomBoards(nextBoards);
+        storageService.saveCustomBoards(nextBoards);
+      }
     }
 
     if (id) {
       // Update
-      const updated = { ...noteData, id, updatedAt: now } as PostItNote;
-      setNotes((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, ...noteData, updatedAt: now } : n))
-      );
+      const existing = notes.find((n) => n.id === id);
+      const updated: PostItNote = {
+        ...existing,
+        ...noteData,
+        book: cleanBook,
+        category: cleanCategory,
+        id,
+        updatedAt: now,
+        order: existing?.order !== undefined ? existing.order : 0,
+        createdAt: existing?.createdAt || now,
+      };
+
+      const nextNotes = notes.map((n) => (n.id === id ? updated : n));
+      setNotes(nextNotes);
+      storageService.saveNotes(nextNotes);
+
       showToast('บันทึกการแก้ไขแล้ว');
       if (targetUrl) {
         setSyncStatus('syncing');
@@ -497,10 +663,21 @@ export function App() {
       const newNote: PostItNote = {
         id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
         ...noteData,
+        book: cleanBook,
+        category: cleanCategory,
+        order: 0,
         createdAt: now,
         updatedAt: now,
       };
-      setNotes((prev) => [newNote, ...prev]);
+      setNotes((prev) => {
+        const shifted = prev.map((n, idx) => ({
+          ...n,
+          order: idx + 1,
+        }));
+        const nextNotes = [newNote, ...shifted];
+        storageService.saveNotes(nextNotes);
+        return nextNotes;
+      });
       showToast('สร้างโพสต์อิทแล้ว');
       confetti({
         particleCount: 25,
@@ -516,17 +693,110 @@ export function App() {
     }
   };
 
-  const handleDeleteNote = (id: string) => {
-    if (window.confirm('คุณต้องการลบโพสต์อิทนี้ใช่หรือไม่?')) {
+  // Drag Start Handler (Snapshots card rects once for ultra-fast collision detection)
+  const handleStartDrag = (note: PostItNote, clientX: number, clientY: number, rect: DOMRect) => {
+    const cardElements = document.querySelectorAll<HTMLElement>('[data-note-id]');
+    const cardRects: { id: string; rect: DOMRect }[] = [];
+    cardElements.forEach((el) => {
+      const id = el.getAttribute('data-note-id');
+      if (id && id !== note.id) {
+        cardRects.push({ id, rect: el.getBoundingClientRect() });
+      }
+    });
+
+    const offsetX = clientX - rect.left;
+    const offsetY = clientY - rect.top;
+
+    initialPosRef.current = { x: rect.left, y: rect.top };
+    dragStateRef.current = {
+      note,
+      offsetX,
+      offsetY,
+      targetId: null,
+      cardRects,
+    };
+
+    setActiveDragNote(note);
+    setActiveDragWidth(rect.width);
+    setDropTargetId(null);
+  };
+
+  // Reorder Handler (Persisted to LocalStorage and Synced to Google Sheets)
+  const handleReorderNotes = (sourceId: string, targetId: string) => {
+    if (!sourceId || !targetId || sourceId === targetId) return;
+
+    setNotes((prevNotes) => {
+      // Sort notes by current effective display order
+      const sorted = [...prevNotes].sort((a, b) => {
+        const orderA = typeof a.order === 'number' ? a.order : 0;
+        const orderB = typeof b.order === 'number' ? b.order : 0;
+        if (orderA !== orderB) return orderA - orderB;
+        const timeA = new Date(a.updatedAt || a.createdAt).getTime();
+        const timeB = new Date(b.updatedAt || b.createdAt).getTime();
+        return timeB - timeA;
+      });
+
+      const sourceIndex = sorted.findIndex((n) => n.id === sourceId);
+      const targetIndex = sorted.findIndex((n) => n.id === targetId);
+      if (sourceIndex === -1 || targetIndex === -1) return prevNotes;
+
+      const updated = [...sorted];
+      const [movedNote] = updated.splice(sourceIndex, 1);
+      updated.splice(targetIndex, 0, movedNote);
+
+      // Re-assign sequential order numbers
+      const withNewOrder = updated.map((note, idx) => ({
+        ...note,
+        order: idx,
+      }));
+
+      // 1. Save to LocalStorage immediately
+      storageService.saveNotes(withNewOrder);
+
+      // 2. Sync to Google Sheets for cross-device consistency
       const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
-      setNotes((prev) => prev.filter((n) => n.id !== id));
-      showToast('ลบโพสต์อิทแล้ว');
       if (targetUrl) {
         setSyncStatus('syncing');
-        storageService.apiDeleteNote(targetUrl, id)
+        storageService.syncToGoogleSheets(targetUrl, withNewOrder)
           .then(() => setSyncStatus('connected'))
-          .catch(() => setSyncStatus('connected'));
+          .catch((err) => {
+            console.warn('Sync order failed:', err);
+            setSyncStatus('connected');
+          });
       }
+
+      return withNewOrder;
+    });
+
+    showToast('จัดตำแหน่งการ์ดเรียบร้อย 📌');
+  };
+
+  const handleDeleteNote = async (id: string) => {
+    const noteToDelete = notes.find((n) => n.id === id);
+    const confirmed = await confirm({
+      title: 'คุณต้องการลบการ์ดนี้',
+      message: noteToDelete?.title
+        ? `"${noteToDelete.title}"`
+        : 'ข้อมูลจะถูกลบออกจากกระดานอย่างถาวรและไม่สามารถกู้คืนได้',
+      confirmText: 'ยืนยัน',
+      cancelText: 'ยกเลิก',
+      variant: 'danger',
+    });
+
+    if (!confirmed) return;
+
+    const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
+    setNotes((prev) => prev.filter((n) => n.id !== id));
+    showToast('ลบโพสต์อิทแล้ว');
+    if (isModalOpen && editingNote?.id === id) {
+      setIsModalOpen(false);
+      setEditingNote(null);
+    }
+    if (targetUrl) {
+      setSyncStatus('syncing');
+      storageService.apiDeleteNote(targetUrl, id)
+        .then(() => setSyncStatus('connected'))
+        .catch(() => setSyncStatus('connected'));
     }
   };
 
@@ -566,17 +836,14 @@ export function App() {
     setIsModalOpen(true);
   };
 
-  const currentBookNotesCount = useMemo(() => {
-    if (selectedBook === 'All') return notes.length;
-    return notes.filter((n) => (n.book || 'ทั่วไป') === selectedBook).length;
-  }, [notes, selectedBook]);
+  const realNotes = useMemo(() => notes.filter((n) => n.id !== '__SYSTEM_TAXONOMY__'), [notes]);
 
   const pinnedCount = useMemo(() => {
     const sourceNotes = selectedBook === 'All' 
-      ? notes 
-      : notes.filter((n) => (n.book || 'ทั่วไป') === selectedBook);
+      ? realNotes 
+      : realNotes.filter((n) => (n.book || 'ทั่วไป').trim() === selectedBook.trim());
     return sourceNotes.filter((n) => n.isPinned).length;
-  }, [notes, selectedBook]);
+  }, [realNotes, selectedBook]);
 
   return (
     <div className="min-h-screen bg-muji-grid flex flex-col selection:bg-[#EAE6DE] selection:text-[#2D2824]">
@@ -586,6 +853,23 @@ export function App() {
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-[#2D2824] text-[#FAF8F5] dark:bg-[#ECE9E4] dark:text-[#1D1B1A] shadow-xl border border-black/10 dark:border-white/10 text-sm font-medium animate-slideUp">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 dark:text-emerald-600 stroke-[2.5]" />
           <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Floating Dragged Card (Direct DOM transform at 120 FPS, zero lag) */}
+      {activeDragNote && (
+        <div
+          ref={dragCardRef}
+          className="fixed top-0 left-0 pointer-events-none z-[9999] will-change-transform select-none"
+          style={{
+            width: `${activeDragWidth}px`,
+            transform: `translate3d(${initialPosRef.current.x}px, ${initialPosRef.current.y}px, 0) scale(1.04) rotate(1.5deg)`,
+            transition: 'none',
+          }}
+        >
+          <div className="shadow-2xl rounded-3xl ring-2 ring-amber-500/50">
+            <PostItCardPreview note={activeDragNote} />
+          </div>
         </div>
       )}
 
@@ -599,7 +883,7 @@ export function App() {
         }}
         darkMode={darkMode}
         onToggleDarkMode={() => setDarkMode(!darkMode)}
-        totalNotes={notes.length}
+        totalNotes={realNotes.length}
         syncStatus={syncStatus}
         onSyncNow={handleSyncNow}
       />
@@ -651,6 +935,9 @@ export function App() {
                     onDelete={handleDeleteNote}
                     onTogglePin={handleTogglePin}
                     onToggleComplete={handleToggleComplete}
+                    onStartDrag={handleStartDrag}
+                    isDraggingThis={activeDragNote?.id === note.id}
+                    isDropTarget={dropTargetId === note.id}
                   />
                 ))}
               </div>
@@ -695,6 +982,7 @@ export function App() {
           setEditingNote(null);
         }}
         onSave={handleSaveNote}
+        onDelete={handleDeleteNote}
         editingNote={editingNote}
         categories={allCategoriesGlobal}
         books={allBooks}

@@ -1,10 +1,18 @@
 import { PostItNote, GoogleSheetsConfig } from '@/types/post-it';
-import { initialNotes } from '@/data/sampleNotes';
 
 const STORAGE_KEY = 'webapp_post_it_notes_v1';
 const SHEETS_CONFIG_KEY = 'webapp_post_it_sheets_config_v1';
+const CUSTOM_BOARDS_KEY = 'webapp_post_it_custom_boards_v1';
+const CUSTOM_CATEGORIES_KEY = 'webapp_post_it_custom_categories_v1';
+export const SYSTEM_TAXONOMY_ID = '__SYSTEM_TAXONOMY__';
 
 export const DEFAULT_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbyEUz_zRyVTxXarSP3OBnIg4YLOvUblb4-iMcu7VIf7-Nj608sWtkIHEYU9jCNUW_Sy/exec';
+
+export interface FetchNotesResult {
+  notes: PostItNote[];
+  boards: string[];
+  categories: string[];
+}
 
 export const storageService = {
   // ==========================================
@@ -18,10 +26,13 @@ export const storageService = {
       }
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed)) {
-        return parsed.map((n) => ({
-          ...n,
-          book: n.book && n.book.trim() ? n.book : 'ทั่วไป',
-        }));
+        return parsed
+          .filter((n) => n.id !== SYSTEM_TAXONOMY_ID)
+          .map((n, idx) => ({
+            ...n,
+            order: typeof n.order === 'number' ? n.order : idx,
+            book: n.book && n.book.trim() ? n.book : 'ทั่วไป',
+          }));
       }
       return [];
     } catch (err) {
@@ -32,9 +43,44 @@ export const storageService = {
 
   saveNotes(notes: PostItNote[]) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+      const clean = notes.filter((n) => n.id !== SYSTEM_TAXONOMY_ID);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
     } catch (err) {
       console.error('Error saving notes to localStorage:', err);
+    }
+  },
+
+  getCustomBoards(): string[] {
+    try {
+      const saved = localStorage.getItem(CUSTOM_BOARDS_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  },
+
+  saveCustomBoards(boards: string[]) {
+    try {
+      localStorage.setItem(CUSTOM_BOARDS_KEY, JSON.stringify(boards));
+    } catch (err) {
+      console.error('Error saving custom boards to localStorage:', err);
+    }
+  },
+
+  getCustomCategories(): string[] {
+    try {
+      const saved = localStorage.getItem(CUSTOM_CATEGORIES_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  },
+
+  saveCustomCategories(cats: string[]) {
+    try {
+      localStorage.setItem(CUSTOM_CATEGORIES_KEY, JSON.stringify(cats));
+    } catch (err) {
+      console.error('Error saving custom categories to localStorage:', err);
     }
   },
 
@@ -51,6 +97,30 @@ export const storageService = {
     } catch (err) {
       console.error('Error saving sheets config:', err);
     }
+  },
+
+  // Builds the system metadata record storing all boards and categories into Google Sheets
+  buildTaxonomyNote(boards?: string[], categories?: string[]): PostItNote {
+    const effectiveBoards = boards || this.getCustomBoards();
+    const effectiveCategories = categories || this.getCustomCategories();
+
+    return {
+      id: SYSTEM_TAXONOMY_ID,
+      title: '[ระบบ] รายชื่อบอร์ดและหมวดหมู่ (Taxonomy Metadata)',
+      content: JSON.stringify({
+        boards: effectiveBoards,
+        categories: effectiveCategories,
+      }),
+      category: 'ระบบ',
+      book: 'ระบบ',
+      color: 'sand',
+      tags: ['system', 'taxonomy'],
+      isPinned: false,
+      isCompleted: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      order: -999,
+    };
   },
 
   // ==========================================
@@ -73,8 +143,8 @@ export const storageService = {
     }
   },
 
-  // 2. GET All Notes
-  async fetchFromGoogleSheets(webAppUrl: string): Promise<PostItNote[]> {
+  // 2. GET All Notes & Taxonomy (Boards & Categories)
+  async fetchFromGoogleSheets(webAppUrl: string): Promise<FetchNotesResult> {
     if (!webAppUrl) throw new Error('กรุณาระบุ Google Apps Script Web App URL');
     
     const separator = webAppUrl.includes('?') ? '&' : '?';
@@ -95,10 +165,72 @@ export const storageService = {
     }
 
     if (data.status === 'success' && Array.isArray(data.notes)) {
-      return data.notes.map((n: PostItNote) => ({
-        ...n,
-        book: n.book && n.book.trim() ? n.book : 'ทั่วไป',
-      }));
+      let extractedBoards: string[] = [];
+      let extractedCategories: string[] = [];
+
+      // Detect and extract taxonomy system note
+      const taxonomyNote = data.notes.find((n: PostItNote) => n.id === SYSTEM_TAXONOMY_ID);
+      if (taxonomyNote) {
+        try {
+          const parsed = JSON.parse(taxonomyNote.content);
+          if (Array.isArray(parsed.boards)) {
+            extractedBoards = parsed.boards;
+            this.saveCustomBoards(parsed.boards);
+          }
+          if (Array.isArray(parsed.categories)) {
+            extractedCategories = parsed.categories;
+            this.saveCustomCategories(parsed.categories);
+          }
+        } catch (err) {
+          console.warn('Failed to parse taxonomy metadata note:', err);
+        }
+      }
+
+      // Filter out system note from user-facing notes
+      const existingLocalNotes = this.getNotes();
+      const existingLocalMap = new Map(existingLocalNotes.map((n) => [n.id, n]));
+
+      const userNotes = data.notes
+        .filter((n: PostItNote) => n.id !== SYSTEM_TAXONOMY_ID)
+        .map((n: PostItNote, idx: number) => {
+          const localNote = existingLocalMap.get(n.id);
+          // If sheet returned a valid book, use it!
+          // If sheet returned empty/undefined (older script version or unpopulated column), PRESERVE existing local book!
+          const sheetBook = n.book && n.book.trim() ? n.book.trim() : '';
+          const localBook = localNote && localNote.book && localNote.book.trim() ? localNote.book.trim() : '';
+          const effectiveBook = sheetBook || localBook || 'ทั่วไป';
+
+          return {
+            ...n,
+            order: typeof n.order === 'number' ? n.order : (typeof localNote?.order === 'number' ? localNote.order : idx),
+            book: effectiveBook,
+          };
+        });
+
+      // Also harvest boards & categories directly from existing notes and localStorage so created boards never vanish
+      const localBoards = this.getCustomBoards();
+      const booksFromNotes = userNotes
+        .map((n: PostItNote) => (n.book || '').trim())
+        .filter((b: string) => b && b !== 'ทั่วไป' && b !== 'ระบบ');
+      const allExtractedBoards = Array.from(new Set([...localBoards, ...extractedBoards, ...booksFromNotes]));
+      if (allExtractedBoards.length > 0) {
+        this.saveCustomBoards(allExtractedBoards);
+      }
+
+      const localCats = this.getCustomCategories();
+      const catsFromNotes = userNotes
+        .map((n: PostItNote) => (n.category || '').trim())
+        .filter((c: string) => c && c !== 'ทั่วไป' && c !== 'ระบบ');
+      const allExtractedCats = Array.from(new Set([...localCats, ...extractedCategories, ...catsFromNotes]));
+      if (allExtractedCats.length > 0) {
+        this.saveCustomCategories(allExtractedCats);
+      }
+
+      return {
+        notes: userNotes,
+        boards: allExtractedBoards,
+        categories: allExtractedCats,
+      };
     } else {
       throw new Error(data.message || 'ไม่สามารถดึงข้อมูลจาก Google Sheets ได้');
     }
@@ -149,13 +281,30 @@ export const storageService = {
     });
   },
 
-  // 8. POST: Bulk Sync Notes
-  async syncToGoogleSheets(webAppUrl: string, notes: PostItNote[]): Promise<string> {
+  // 8. POST: Bulk Sync Notes & Taxonomy (Boards and Categories)
+  async syncToGoogleSheets(
+    webAppUrl: string, 
+    notes: PostItNote[], 
+    boards?: string[], 
+    categories?: string[]
+  ): Promise<string> {
     if (!webAppUrl) throw new Error('กรุณาระบุ Google Apps Script Web App URL');
+
+    const effectiveBoards = boards || this.getCustomBoards();
+    const effectiveCategories = categories || this.getCustomCategories();
+
+    // Persist to local storage as well
+    if (boards) this.saveCustomBoards(boards);
+    if (categories) this.saveCustomCategories(categories);
+
+    // Build the system taxonomy note containing all boards and categories
+    const taxonomyNote = this.buildTaxonomyNote(effectiveBoards, effectiveCategories);
+    const cleanUserNotes = notes.filter((n) => n.id !== SYSTEM_TAXONOMY_ID);
+    const allNotesToSync = [taxonomyNote, ...cleanUserNotes];
 
     const data = await this.postToApi(webAppUrl, {
       action: 'sync',
-      notes: notes,
+      notes: allNotesToSync,
     });
 
     return data.message || 'ซิงค์ข้อมูลสำเร็จ';
@@ -184,7 +333,8 @@ export const storageService = {
 
   // Export JSON backup
   exportJSON(notes: PostItNote[]) {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(notes, null, 2));
+    const clean = notes.filter((n) => n.id !== SYSTEM_TAXONOMY_ID);
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(clean, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
     downloadAnchor.setAttribute("download", `post-it-backup-${new Date().toISOString().slice(0, 10)}.json`);

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { X, LayoutGrid, Layers, Edit2, Trash2, Check, Plus } from 'lucide-react';
+import { X, LayoutGrid, Layers, Edit2, Trash2, Check, Plus, AlertTriangle } from 'lucide-react';
+import { useConfirm } from '@/context/ConfirmContext';
 
 interface ManageTaxonomyModalProps {
   isOpen: boolean;
@@ -30,6 +31,7 @@ export const ManageTaxonomyModal: React.FC<ManageTaxonomyModalProps> = ({
   onDeleteCategory,
   onAddCategory,
 }) => {
+  const { confirm } = useConfirm();
   const [activeTab, setActiveTab] = useState<'boards' | 'categories'>('boards');
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -48,17 +50,41 @@ export const ManageTaxonomyModal: React.FC<ManageTaxonomyModalProps> = ({
     setEditValue('');
   };
 
-  const saveBoardRename = (oldName: string) => {
+  const saveBoardRename = async (oldName: string) => {
     const trimmed = editValue.trim();
     if (trimmed && trimmed !== oldName) {
+      const count = bookCounts[oldName] || 0;
+      if (count > 0) {
+        const confirmed = await confirm({
+          title: 'ยืนยันการเปลี่ยนชื่อบอร์ด',
+          message: `คุณต้องการเปลี่ยนชื่อบอร์ดจาก "${oldName}" เป็น "${trimmed}" ใช่หรือไม่?`,
+          detail: `โพสต์อิททั้งหมด ${count} รายการในบอร์ดนี้จะถูกอัปเดตชื่อบอร์ดใหม่ทันที`,
+          confirmText: 'ยืนยันการแก้ไข',
+          cancelText: 'ยกเลิก',
+          variant: 'info',
+        });
+        if (!confirmed) return;
+      }
       onRenameBoard(oldName, trimmed);
     }
     cancelEdit();
   };
 
-  const saveCategoryRename = (oldName: string) => {
+  const saveCategoryRename = async (oldName: string) => {
     const trimmed = editValue.trim();
     if (trimmed && trimmed !== oldName) {
+      const count = categoryCounts[oldName] || 0;
+      if (count > 0) {
+        const confirmed = await confirm({
+          title: 'ยืนยันการเปลี่ยนชื่อหมวดหมู่',
+          message: `คุณต้องการเปลี่ยนชื่อหมวดหมู่จาก "${oldName}" เป็น "${trimmed}" ใช่หรือไม่?`,
+          detail: `โพสต์อิททั้งหมด ${count} รายการในหมวดนี้จะถูกอัปเดตชื่อหมวดหมู่ใหม่ทันที`,
+          confirmText: 'ยืนยันการแก้ไข',
+          cancelText: 'ยกเลิก',
+          variant: 'info',
+        });
+        if (!confirmed) return;
+      }
       onRenameCategory(oldName, trimmed);
     }
     cancelEdit();
@@ -82,28 +108,51 @@ export const ManageTaxonomyModal: React.FC<ManageTaxonomyModalProps> = ({
     }
   };
 
-  const handleDeleteBoardClick = (board: string) => {
+  const handleDeleteBoardClick = async (board: string) => {
     if (board === 'ทั่วไป') return;
     const count = bookCounts[board] || 0;
-    const confirmMsg = count > 0
-      ? `คุณต้องการลบบอร์ด "${board}" ใช่หรือไม่?\n\n* โน้ตในบอร์ดนี้ (${count} รายการ) จะถูกย้ายไปเก็บที่บอร์ด "ทั่วไป" อัตโนมัติ ไม่สูญหาย`
-      : `คุณต้องการลบบอร์ด "${board}" ใช่หรือไม่?`;
-    if (window.confirm(confirmMsg)) {
+    const confirmed = await confirm({
+      title: 'ยืนยันการลบบอร์ด',
+      message: `คุณต้องการลบบอร์ด "${board}" ใช่หรือไม่?`,
+      detail: count > 0 ? (
+        <div className="flex items-start gap-2 text-amber-800 dark:text-amber-300">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>โน้ตในบอร์ดนี้ ({count} รายการ) จะถูกย้ายไปเก็บที่บอร์ด "ทั่วไป" อัตโนมัติ โดยข้อมูลจะไม่สูญหาย</span>
+        </div>
+      ) : undefined,
+      confirmText: 'ลบบอร์ด',
+      cancelText: 'ยกเลิก',
+      variant: 'danger',
+    });
+
+    if (confirmed) {
       onDeleteBoard(board);
       cancelEdit();
     }
   };
 
-  const handleDeleteCategoryClick = (cat: string) => {
+  const handleDeleteCategoryClick = async (cat: string) => {
     const count = categoryCounts[cat] || 0;
-    const confirmMsg = count > 0
-      ? `คุณต้องการลบหมวดหมู่ "${cat}" ใช่หรือไม่?\n\n* โน้ตในหมวดหมู่นี้ (${count} รายการ) จะถูกย้ายไปที่หมวดหมู่อื่นอัตโนมัติ ไม่สูญหาย`
-      : `คุณต้องการลบหมวดหมู่ "${cat}" ใช่หรือไม่?`;
-    if (window.confirm(confirmMsg)) {
+    const confirmed = await confirm({
+      title: 'ยืนยันการลบหมวดหมู่',
+      message: `คุณต้องการลบหมวดหมู่ "${cat}" ใช่หรือไม่?`,
+      detail: count > 0 ? (
+        <div className="flex items-start gap-2 text-amber-800 dark:text-amber-300">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>โน้ตในหมวดหมู่นี้ ({count} รายการ) จะถูกย้ายไปหมวดหมู่อื่นอัตโนมัติ โดยข้อมูลจะไม่สูญหาย</span>
+        </div>
+      ) : undefined,
+      confirmText: 'ลบหมวดหมู่',
+      cancelText: 'ยกเลิก',
+      variant: 'danger',
+    });
+
+    if (confirmed) {
       onDeleteCategory(cat);
       cancelEdit();
     }
   };
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-xs animate-fadeIn">

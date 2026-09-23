@@ -31,6 +31,7 @@ export interface PostItNote {
   createdAt: string;
   updatedAt: string;
   glowColor?: 'blue' | 'purple' | 'green' | 'red' | 'orange';
+  order?: number; // ลำดับตำแหน่งการ์ดสำหรับ Drag & Drop
 }
 
 export interface GoogleSheetsConfig {

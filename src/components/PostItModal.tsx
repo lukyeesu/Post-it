@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { X, Pin, Tag, LayoutGrid } from 'lucide-react';
+import { X, Pin, Tag, LayoutGrid, Trash2 } from 'lucide-react';
 import { PostItNote, NoteColor } from '@/types/post-it';
+import { useConfirm } from '@/context/ConfirmContext';
 
 interface PostItModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (note: Omit<PostItNote, 'id' | 'createdAt' | 'updatedAt'>, id?: string) => void;
+  onDelete?: (id: string) => void;
   editingNote?: PostItNote | null;
   categories: string[];
   books: string[];
@@ -26,11 +28,13 @@ export const PostItModal: React.FC<PostItModalProps> = ({
   isOpen,
   onClose,
   onSave,
+  onDelete,
   editingNote,
   categories,
   books,
   defaultBook = 'ทั่วไป',
 }) => {
+  const { confirm } = useConfirm();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [book, setBook] = useState(defaultBook);
@@ -42,10 +46,12 @@ export const PostItModal: React.FC<PostItModalProps> = ({
   const [isPinned, setIsPinned] = useState(false);
 
   useEffect(() => {
+    if (!isOpen) return;
+
     if (editingNote) {
       setTitle(editingNote.title);
       setContent(editingNote.content);
-      setBook(editingNote.book || 'ทั่วไป');
+      setBook((editingNote.book || 'ทั่วไป').trim());
       setCustomBook('');
       setCategory(editingNote.category);
       setCustomCategory('');
@@ -55,7 +61,8 @@ export const PostItModal: React.FC<PostItModalProps> = ({
     } else {
       setTitle('');
       setContent('');
-      setBook(defaultBook !== 'All' ? defaultBook : (books[0] || 'ทั่วไป'));
+      const initialBook = defaultBook !== 'All' ? defaultBook : (books[0] || 'ทั่วไป');
+      setBook(initialBook.trim() || 'ทั่วไป');
       setCustomBook('');
       setCategory(categories[0] || 'ทั่วไป');
       setCustomCategory('');
@@ -63,16 +70,61 @@ export const PostItModal: React.FC<PostItModalProps> = ({
       setTagInput('');
       setIsPinned(false);
     }
-  }, [editingNote, isOpen, defaultBook, books, categories]);
+  }, [isOpen, editingNote]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const isDirty = editingNote
+    ? (
+        title !== editingNote.title ||
+        content !== editingNote.content ||
+        book !== (editingNote.book || 'ทั่วไป') ||
+        customBook.trim() !== '' ||
+        category !== editingNote.category ||
+        customCategory.trim() !== '' ||
+        color !== (editingNote.color || 'sand') ||
+        tagInput !== (editingNote.tags || []).join(', ') ||
+        isPinned !== Boolean(editingNote.isPinned)
+      )
+    : (
+        title.trim() !== '' ||
+        content.trim() !== '' ||
+        customBook.trim() !== '' ||
+        customCategory.trim() !== '' ||
+        tagInput.trim() !== ''
+      );
+
+  const handleRequestClose = async () => {
+    if (isDirty) {
+      const discard = await confirm({
+        title: editingNote ? 'ยกเลิกการแก้ไข?' : 'ยกเลิกการสร้างโพสต์อิท?',
+        message: 'คุณมีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก ต้องการยกเลิกและละทิ้งการเปลี่ยนแปลงนี้ใช่หรือไม่?',
+        confirmText: 'ละทิ้งการเปลี่ยนแปลง',
+        cancelText: 'แก้ไขต่อ',
+        variant: 'warning',
+      });
+      if (!discard) return;
+    }
+    onClose();
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() && !content.trim()) return;
 
-    const finalBook = customBook.trim() ? customBook.trim() : (book === 'custom' ? 'ทั่วไป' : book);
-    const finalCategory = customCategory.trim() ? customCategory.trim() : category;
+    if (editingNote && isDirty) {
+      const confirmed = await confirm({
+        title: 'ยืนยันการแก้ไขโพสต์อิท',
+        message: `คุณต้องการบันทึกการแก้ไขของโพสต์อิท "${title.trim() || editingNote.title}" ใช่หรือไม่?`,
+        confirmText: 'บันทึกการแก้ไข',
+        cancelText: 'ยกเลิก',
+        variant: 'info',
+      });
+      if (!confirmed) return;
+    }
+
+    const finalBook = (book === 'custom' ? customBook : book).trim() || 'ทั่วไป';
+    const finalCategory = (customCategory.trim() ? customCategory.trim() : category).trim() || 'ทั่วไป';
     const tags = tagInput
       .split(',')
       .map((t) => t.trim().replace(/^#/, ''))
@@ -80,7 +132,7 @@ export const PostItModal: React.FC<PostItModalProps> = ({
 
     onSave(
       {
-        book: finalBook || 'ทั่วไป',
+        book: finalBook,
         title: title.trim() || 'ไม่มีหัวข้อ',
         content: content.trim(),
         category: finalCategory,
@@ -94,7 +146,10 @@ export const PostItModal: React.FC<PostItModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-xs animate-fadeIn">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-xs animate-fadeIn"
+      onClick={handleRequestClose}
+    >
       <div 
         className="w-full max-w-xl bg-[#FAF8F5] dark:bg-[#201D1C] rounded-3xl shadow-2xl border border-[#E8E4DC] dark:border-[#363230] overflow-hidden flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
@@ -107,12 +162,13 @@ export const PostItModal: React.FC<PostItModalProps> = ({
             </h2>
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleRequestClose}
               className="w-9 h-9 rounded-xl flex items-center justify-center text-[#8A857D] hover:text-[#2D2824] dark:hover:text-[#ECE9E4] hover:bg-[#EFECE6] dark:hover:bg-[#2A2725] transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
+
 
           {/* Form Body - Scrollable */}
           <div className="p-6 sm:p-8 space-y-5 overflow-y-auto flex-1">
@@ -126,12 +182,19 @@ export const PostItModal: React.FC<PostItModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <select
                 value={book}
-                onChange={(e) => setBook(e.target.value)}
+                onChange={(e) => {
+                  setBook(e.target.value);
+                  if (e.target.value !== 'custom') {
+                    setCustomBook('');
+                  }
+                }}
                 className="w-full px-4 py-2.5 rounded-xl border border-[#E0DBD0] dark:border-[#363330] bg-white dark:bg-[#262322] text-[#2D2824] dark:text-[#ECE9E4] text-sm sm:text-base focus:outline-none focus:border-[#713F12]/50 shadow-2xs"
               >
-                {books.map((b) => (
-                  <option key={b} value={b}>{b}</option>
-                ))}
+                {Array.from(new Set(['ทั่วไป', ...books, book]))
+                  .filter((b) => b && b !== 'custom' && b !== 'All')
+                  .map((b) => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
                 <option value="custom">+ เพิ่มบอร์ดใหม่...</option>
               </select>
 
@@ -269,22 +332,40 @@ export const PostItModal: React.FC<PostItModalProps> = ({
         </div>
 
         {/* Modal Footer (Fixed at bottom) */}
-          <div className="px-6 sm:px-8 py-4 border-t border-[#E8E4DC] dark:border-[#363230] bg-[#FAF8F5] dark:bg-[#201D1C] flex items-center justify-end gap-3 shrink-0">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-2.5 rounded-2xl text-sm sm:text-base font-medium text-[#7A756E] hover:text-[#2D2824] dark:hover:text-[#ECE9E4] hover:bg-[#EFECE6] dark:hover:bg-[#2A2725] transition-colors"
-            >
-              ยกเลิก
-            </button>
-            <button
-              type="submit"
-              className="px-6 py-2.5 rounded-2xl text-sm sm:text-base font-semibold bg-[#2D2824] hover:bg-[#1C1816] text-[#FAF8F5] dark:bg-[#ECE9E4] dark:text-[#1D1B1A] dark:hover:bg-[#FFFFFF] transition-all shadow-sm active:scale-95"
-            >
-              {editingNote ? 'บันทึกการแก้ไข' : 'สร้างโพสต์อิท'}
-            </button>
+          <div className="px-6 sm:px-8 py-4 border-t border-[#E8E4DC] dark:border-[#363230] bg-[#FAF8F5] dark:bg-[#201D1C] flex items-center justify-between gap-3 shrink-0">
+            {/* Left side: Delete button if in edit mode */}
+            {editingNote && onDelete ? (
+              <button
+                type="button"
+                onClick={() => onDelete(editingNote.id)}
+                className="px-3.5 py-2 rounded-2xl text-xs sm:text-sm font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 flex items-center gap-1.5 transition-colors border border-transparent hover:border-rose-200 dark:hover:border-rose-900/50"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>ลบโพสต์อิทนี้</span>
+              </button>
+            ) : (
+              <div />
+            )}
+
+            {/* Right side: Cancel & Save */}
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={handleRequestClose}
+                className="px-5 py-2.5 rounded-2xl text-sm sm:text-base font-medium text-[#7A756E] hover:text-[#2D2824] dark:hover:text-[#ECE9E4] hover:bg-[#EFECE6] dark:hover:bg-[#2A2725] transition-colors"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="submit"
+                className="px-6 py-2.5 rounded-2xl text-sm sm:text-base font-semibold bg-[#2D2824] hover:bg-[#1C1816] text-[#FAF8F5] dark:bg-[#ECE9E4] dark:text-[#1D1B1A] dark:hover:bg-[#FFFFFF] transition-all shadow-sm active:scale-95"
+              >
+                {editingNote ? 'บันทึกการแก้ไข' : 'สร้างโพสต์อิท'}
+              </button>
+            </div>
           </div>
         </form>
+
       </div>
     </div>
   );

@@ -47,7 +47,8 @@ const HEADERS = [
   'glowColor',   // I: สีแสง Glow ของ Spotlight card
   'createdAt',   // J: วันเวลาที่สร้าง (ISO Date string)
   'updatedAt',   // K: วันเวลาที่แก้ไขล่าสุด (ISO Date string)
-  'book'         // L: เล่มหนังสือ (เช่น กีฬา, งาน, ทั่วไป)
+  'book',        // L: เล่มหนังสือ (เช่น กีฬา, งาน, ทั่วไป)
+  'order'        // M: ลำดับการจัดวางการ์ด Drag & Drop (0, 1, 2...)
 ];
 
 // (ทางเลือก) หากสร้าง Apps Script แยกต่างหากที่ script.google.com (Standalone) 
@@ -100,30 +101,36 @@ function getSpreadsheet() {
 }
 
 /**
- * ฟังก์ชันสร้างหรือดึงชีตสำหรับเก็บ Post-it พร้อมจัดรูปแบบตารางอัตโนมัติ
+ * ฟังก์ชันตรวจสอบและอัปเดตหัวตาราง (Schema) ให้ครบถ้วน 13 คอลัมน์เสมอ
  */
-function getOrCreateSheet() {
-  const ss = getSpreadsheet();
-  if (!ss) {
-    throw new Error('ไม่พบสเปรดชีต Google Sheets');
+function ensureHeadersAndSchema(sheet) {
+  if (!sheet) return;
+  const lastCol = Math.max(sheet.getLastColumn(), HEADERS.length);
+  let currentHeaders = [];
+  if (lastCol > 0 && sheet.getLastRow() > 0) {
+    try {
+      currentHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    } catch(e) {}
   }
 
-  let sheet = ss.getSheetByName(SHEET_NAME);
-  
-  if (!sheet) {
-    sheet = ss.insertSheet(SHEET_NAME);
-    // เพิ่มแถวหัวตาราง
-    sheet.appendRow(HEADERS);
-    
-    // จัดสไตล์หัวตารางให้สวยงามน่าใช้งาน
+  let needsUpdate = false;
+  for (let i = 0; i < HEADERS.length; i++) {
+    if (!currentHeaders[i] || String(currentHeaders[i]).trim() !== HEADERS[i]) {
+      needsUpdate = true;
+      break;
+    }
+  }
+
+  if (needsUpdate) {
     const headerRange = sheet.getRange(1, 1, 1, HEADERS.length);
+    headerRange.setValues([HEADERS]);
     headerRange.setFontWeight('bold')
       .setBackground('#FEF08A') // สีเหลือง Pastel สไตล์ Post-it
       .setFontColor('#713F12')
       .setHorizontalAlignment('center')
       .setVerticalAlignment('middle')
       .setBorder(true, true, true, true, true, true, '#CA8A04', SpreadsheetApp.BorderStyle.SOLID);
-    
+
     sheet.setFrozenRows(1);
     sheet.setRowHeight(1, 38);
     sheet.setColumnWidth(1, 130); // id
@@ -137,18 +144,71 @@ function getOrCreateSheet() {
     sheet.setColumnWidth(9, 100); // glowColor
     sheet.setColumnWidth(10, 190); // createdAt
     sheet.setColumnWidth(11, 190); // updatedAt
-    sheet.setColumnWidth(12, 140); // book
+    sheet.setColumnWidth(12, 140); // book (บอร์ด)
+    sheet.setColumnWidth(13, 90);  // order (ลำดับการ์ด)
+  }
+}
+
+/**
+ * ฟังก์ชันสร้างหรือดึงชีตสำหรับเก็บ Post-it พร้อมจัดรูปแบบตารางอัตโนมัติ
+ */
+function getOrCreateSheet() {
+  const ss = getSpreadsheet();
+  if (!ss) {
+    throw new Error('ไม่พบสเปรดชีต Google Sheets');
+  }
+
+  let sheet = ss.getSheetByName(SHEET_NAME);
+  
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
   }
   
+  ensureHeadersAndSchema(sheet);
   return sheet;
 }
 
 /**
- * ฟังก์ชันสำหรับทดสอบรันในโปรแกรมแก้ไข Apps Script โดยตรง
+ * ฟังก์ชันซ่อมแซมและตั้งค่าชีตอัตโนมัติ (สามารถกดปุ่ม "เรียกใช้ / Run" บน Apps Script ได้เลย)
+ * - สร้างหัวตารางคอลัมน์ L (book) และ M (order) ให้ครบ 13 คอลัมน์
+ * - เติมชื่อบอร์ด 'ทั่วไป' ในแถวที่ช่องบอร์ดว่างให้อัตโนมัติ ป้องกันข้อมูลตกหล่น
  */
 function setupSheet() {
   const sheet = getOrCreateSheet();
-  Logger.log('Setup sheet completed successfully: ' + sheet.getName());
+  ensureHeadersAndSchema(sheet);
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    // ตรวจสอบคอลัมน์ L (book) ว่างหรือไม่ ถ้าว่างให้เติม 'ทั่วไป'
+    const bookRange = sheet.getRange(2, 12, lastRow - 1, 1);
+    const bookValues = bookRange.getValues();
+    let hasFix = false;
+    for (let i = 0; i < bookValues.length; i++) {
+      if (!bookValues[i][0] || String(bookValues[i][0]).trim() === '') {
+        bookValues[i][0] = 'ทั่วไป';
+        hasFix = true;
+      }
+    }
+    if (hasFix) {
+      bookRange.setValues(bookValues);
+    }
+
+    // ตรวจสอบคอลัมน์ M (order) ว่างหรือไม่ ถ้าว่างให้ใส่ลำดับ 0, 1, 2...
+    const orderRange = sheet.getRange(2, 13, lastRow - 1, 1);
+    const orderValues = orderRange.getValues();
+    let hasOrderFix = false;
+    for (let i = 0; i < orderValues.length; i++) {
+      if (orderValues[i][0] === '' || orderValues[i][0] === null || orderValues[i][0] === undefined) {
+        orderValues[i][0] = i;
+        hasOrderFix = true;
+      }
+    }
+    if (hasOrderFix) {
+      orderRange.setValues(orderValues);
+    }
+  }
+
+  Logger.log('Setup & Schema Repair completed successfully! Sheet: ' + sheet.getName());
 }
 
 /**
@@ -268,7 +328,8 @@ function doPost(e) {
         note.glowColor || 'purple',
         note.createdAt || now,
         note.updatedAt || now,
-        note.book || 'ทั่วไป'
+        note.book || 'ทั่วไป',
+        typeof note.order === 'number' ? note.order : 0
       ];
 
       sheet.appendRow(rowData);
@@ -303,7 +364,8 @@ function doPost(e) {
         note.glowColor !== undefined ? note.glowColor : old[8],
         old[9] || now, // วันเวลาสร้างเดิม
         now,           // อัปเดต updatedAt ใหม่
-        note.book !== undefined ? note.book : (old[11] || 'ทั่วไป')
+        note.book !== undefined ? note.book : (old[11] || 'ทั่วไป'),
+        note.order !== undefined ? note.order : (old[12] !== undefined ? old[12] : 0)
       ];
 
       sheet.getRange(rowIndex, 1, 1, HEADERS.length).setValues([updatedRow]);
@@ -367,7 +429,7 @@ function doPost(e) {
       }
 
       if (notes.length > 0) {
-        const rows = notes.map(n => [
+        const rows = notes.map((n, idx) => [
           n.id,
           n.title || '',
           n.content || '',
@@ -379,7 +441,8 @@ function doPost(e) {
           n.glowColor || 'purple',
           n.createdAt || now,
           n.updatedAt || now,
-          n.book || 'ทั่วไป'
+          n.book || 'ทั่วไป',
+          typeof n.order === 'number' ? n.order : idx
         ]);
         sheet.getRange(2, 1, rows.length, HEADERS.length).setValues(rows);
       }
@@ -429,7 +492,8 @@ function parseRowsToNotes(rows) {
       glowColor: String(r[8] || 'purple'),
       createdAt: r[9] ? String(r[9]) : new Date().toISOString(),
       updatedAt: r[10] ? String(r[10]) : new Date().toISOString(),
-      book: r[11] ? String(r[11]) : 'ทั่วไป'
+      book: (r[11] && String(r[11]).trim()) ? String(r[11]).trim() : 'ทั่วไป',
+      order: typeof r[12] === 'number' ? r[12] : (r[12] !== '' && r[12] !== null && !isNaN(Number(r[12])) ? Number(r[12]) : 0)
     };
   });
 }
