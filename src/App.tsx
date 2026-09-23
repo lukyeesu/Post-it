@@ -595,39 +595,44 @@ export function App() {
         return true;
       })
       .sort((a, b) => {
-        // Respect Drag & Drop custom order
+        // 1. Pinned notes always jump to the top automatically!
+        const pinA = a.isPinned ? 1 : 0;
+        const pinB = b.isPinned ? 1 : 0;
+        if (pinA !== pinB) {
+          return pinB - pinA;
+        }
+
+        // 2. Respect Drag & Drop custom order
         const orderA = typeof a.order === 'number' ? a.order : 0;
         const orderB = typeof b.order === 'number' ? b.order : 0;
         if (orderA !== orderB) {
           return orderA - orderB;
         }
 
-        // Fallback to timestamp if order is identical
+        // 3. Fallback to timestamp if order is identical
         const timeA = new Date(a.updatedAt || a.createdAt).getTime();
         const timeB = new Date(b.updatedAt || b.createdAt).getTime();
         return timeB - timeA;
       });
   }, [notes, searchQuery, selectedBook, selectedCategory, showPinnedOnly, showCompletedOnly]);
 
-  // Compute Masonry Grid Columns dynamically (Responsive 1 to 4/5 columns matching viewport)
+  // Compute Masonry Grid Columns dynamically (Responsive 1 to 4 columns matching viewport)
   const [columnCount, setColumnCount] = useState(() => {
-    if (typeof window === 'undefined') return 4;
+    if (typeof window === 'undefined') return 3;
     const w = window.innerWidth;
     if (w < 640) return 1;
     if (w < 1024) return 2;
-    if (w < 1536) return 3;
-    if (w < 1920) return 4;
-    return 5;
+    if (w < 1440) return 3;
+    return 4;
   });
 
   useEffect(() => {
     const updateColumns = () => {
       const w = window.innerWidth;
       if (w < 640) setColumnCount(1);
-      else if (w < 1024) setColumnCount(2);
-      else if (w < 1536) setColumnCount(3);
-      else if (w < 1920) setColumnCount(4);
-      else setColumnCount(5);
+      else if (w < 1024) return setColumnCount(2);
+      else if (w < 1440) return setColumnCount(3);
+      else setColumnCount(4);
     };
     window.addEventListener('resize', updateColumns);
     return () => window.removeEventListener('resize', updateColumns);
@@ -754,8 +759,12 @@ export function App() {
     if (!sourceId || !targetId || sourceId === targetId) return;
 
     setNotes((prevNotes) => {
-      // Sort notes by current effective display order
+      // Sort notes by current effective display order (pinned first, then order, then date)
       const sorted = [...prevNotes].sort((a, b) => {
+        const pinA = a.isPinned ? 1 : 0;
+        const pinB = b.isPinned ? 1 : 0;
+        if (pinA !== pinB) return pinB - pinA;
+
         const orderA = typeof a.order === 'number' ? a.order : 0;
         const orderB = typeof b.order === 'number' ? b.order : 0;
         if (orderA !== orderB) return orderA - orderB;
@@ -830,16 +839,19 @@ export function App() {
 
   const handleTogglePin = (id: string) => {
     const targetUrl = sheetsConfig.webAppUrl || DEFAULT_SHEETS_URL;
-    setNotes((prev) =>
-      prev.map((n) => {
+    setNotes((prev) => {
+      const now = new Date().toISOString();
+      const nextNotes = prev.map((n) => {
         if (n.id === id) {
           const isPinned = !n.isPinned;
-          showToast(isPinned ? 'ปักหมุดแล้ว' : 'ถอนหมุดแล้ว');
-          return { ...n, isPinned };
+          showToast(isPinned ? 'ปักหมุดไว้บนสุดแล้ว 📌' : 'ถอนหมุดแล้ว');
+          return { ...n, isPinned, updatedAt: now };
         }
         return n;
-      })
-    );
+      });
+      storageService.saveNotes(nextNotes);
+      return nextNotes;
+    });
     if (targetUrl) {
       storageService.apiTogglePin(targetUrl, id)
         .then(() => setSyncStatus('connected'))

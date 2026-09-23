@@ -125,9 +125,6 @@ export const PostItCardPreview: React.FC<{ note: PostItNote }> = ({ note }) => {
             <span className="opacity-40 text-[10px] shrink-0 select-none">›</span>
             <span className="font-semibold truncate min-w-0">{note.category}</span>
           </div>
-          {note.isPinned && (
-            <Pin className="w-3.5 h-3.5 fill-[#B45309] text-[#B45309] dark:fill-[#D97706] dark:text-[#D97706] shrink-0" />
-          )}
         </div>
         <h3 className={`font-bold text-base sm:text-lg mb-2 leading-snug tracking-tight ${theme.textColor}`}>
           {note.title}
@@ -340,26 +337,19 @@ export const PostItCard: React.FC<PostItCardProps> = ({
           {/* Top Header: Book > Category & Action Buttons */}
           <div className="flex items-center justify-between gap-2 mb-3 min-w-0">
             {/* Book > Category Hierarchy (Sleek unified breadcrumb pill) */}
-            <div className="flex items-center min-w-0 gap-1.5 flex-1">
-              <div 
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs tracking-tight ${theme.tagBg} min-w-0 max-w-full`}
-                title={`${note.book || 'ทั่วไป'} › ${note.category}`}
-              >
-                <LayoutGrid className="w-3.5 h-3.5 opacity-70 shrink-0" />
-                <span className="font-medium opacity-80 shrink-0">{note.book || 'ทั่วไป'}</span>
-                <span className="opacity-40 text-[10px] shrink-0 select-none">›</span>
-                <span className="font-semibold truncate min-w-0">{note.category}</span>
-              </div>
-              {note.isPinned && (
-                <span title="ปักหมุดไว้บนสุด" className="shrink-0 p-0.5">
-                  <Pin className="w-3.5 h-3.5 fill-[#B45309] text-[#B45309] dark:fill-[#D97706] dark:text-[#D97706]" />
-                </span>
-              )}
+            <div 
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs tracking-tight ${theme.tagBg} min-w-0 max-w-full`}
+              title={`${note.book || 'ทั่วไป'} › ${note.category}`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5 opacity-70 shrink-0" />
+              <span className="font-medium opacity-80 shrink-0">{note.book || 'ทั่วไป'}</span>
+              <span className="opacity-40 text-[10px] shrink-0 select-none">›</span>
+              <span className="font-semibold truncate min-w-0">{note.category}</span>
             </div>
 
             {/* Action Toolbar (Clicking here will NOT copy or trigger drag) */}
             <div 
-              className="flex items-center gap-0.5 shrink-0" 
+              className="flex items-center gap-1.5 shrink-0" 
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
             >
@@ -368,17 +358,17 @@ export const PostItCard: React.FC<PostItCardProps> = ({
                 type="button"
                 onClick={handleCopyButton}
                 onPointerDown={(e) => e.stopPropagation()}
-                className={`w-7.5 h-7.5 rounded-lg flex items-center justify-center transition-all ${
+                className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
                   copied
                     ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 font-bold scale-105'
                     : 'hover:bg-black/5 dark:hover:bg-white/10 ' + theme.mutedText
                 }`}
                 title="คัดลอกเฉพาะเนื้อหา"
               >
-                {copied ? <Check className="w-3.5 h-3.5 stroke-[2.5]" /> : <Copy className="w-3.5 h-3.5" />}
+                {copied ? <Check className="w-4 h-4 stroke-[2.5]" /> : <Copy className="w-4 h-4" />}
               </button>
 
-              {/* Pin Toggle */}
+              {/* Pin Toggle (Changes color only when pinned - no duplicate icon) */}
               <button
                 type="button"
                 onClick={(e) => {
@@ -386,12 +376,14 @@ export const PostItCard: React.FC<PostItCardProps> = ({
                   onTogglePin(note.id);
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
-                className={`w-7.5 h-7.5 rounded-lg flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${
-                  note.isPinned ? 'text-[#B45309] dark:text-[#D97706]' : theme.mutedText
+                className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+                  note.isPinned 
+                    ? 'text-amber-600 dark:text-amber-400 bg-amber-500/15 hover:bg-amber-500/25 ring-1 ring-amber-500/30 scale-105' 
+                    : 'hover:bg-black/5 dark:hover:bg-white/10 ' + theme.mutedText
                 }`}
-                title={note.isPinned ? "ถอนหมุด" : "ปักหมุด"}
+                title={note.isPinned ? "ถอนหมุด" : "ปักหมุดไว้บนสุด"}
               >
-                <Pin className={`w-3.5 h-3.5 ${note.isPinned ? 'fill-current' : ''}`} />
+                <Pin className={`w-4 h-4 ${note.isPinned ? 'fill-amber-600 dark:fill-amber-400 stroke-amber-600 dark:stroke-amber-400' : ''}`} />
               </button>
 
               {/* Edit */}
@@ -402,10 +394,10 @@ export const PostItCard: React.FC<PostItCardProps> = ({
                   onEdit(note);
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
-                className={`w-7.5 h-7.5 rounded-lg flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${theme.mutedText}`}
+                className={`w-8 h-8 rounded-xl flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${theme.mutedText}`}
                 title="แก้ไข"
               >
-                <Edit3 className="w-3.5 h-3.5" />
+                <Edit3 className="w-4 h-4" />
               </button>
 
               {/* Delete */}
@@ -416,10 +408,10 @@ export const PostItCard: React.FC<PostItCardProps> = ({
                   onDelete(note.id);
                 }}
                 onPointerDown={(e) => e.stopPropagation()}
-                className="w-7.5 h-7.5 rounded-lg flex items-center justify-center hover:bg-rose-500/10 text-rose-500/80 hover:text-rose-600 transition-colors"
+                className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-rose-500/10 text-rose-500/80 hover:text-rose-600 transition-colors"
                 title="ลบ"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="w-4 h-4" />
               </button>
             </div>
           </div>
